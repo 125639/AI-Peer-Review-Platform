@@ -1,140 +1,333 @@
 import asyncio
 import re
-import aiohttp
-from typing import List, Dict, Any, Tuple, AsyncGenerator
+from typing import List, Dict, Any, AsyncGenerator
 
 from .models import create_model_instance
 import core.database as db
 
-async def _get_completed_future(result):
-    """一个辅助函数，将一个结果包装成一个已完成的 Future。"""
-    return result
-
 class Orchestrator:
-    async def process_query_stream(self, user_question: str, selected_models: List[str], history: List[Dict[str, str]]) -> AsyncGenerator[Dict[str, Any], None]:
-        yield {"type": "status", "data": "初始化模型..."}
-        active_models = [
-            instance for sm_id in selected_models
-            if (provider_config := db.get_provider_by_name(sm_id.split('::', 1)[0]))
-            and (instance := create_model_instance(provider_config, sm_id.split('::', 1)[1]))
-        ]
-        if not active_models:
-            yield {"type": "error", "data": "错误：没有选择任何有效的模型。"}; return
-        messages = history + [{"role": "user", "content": user_question}]
-        async with aiohttp.ClientSession() as session:
-            yield {"type": "status", "data": f"第一轮：{len(active_models)}个模型正在生成初始答案..."}
-            initial_answers = await self._generate_initial_answers(messages, active_models, session)
-            
-            if len(active_models) > 1:
-                yield {"type": "status", "data": "第二轮：进行交叉评审..."}
-                critiques = await self._critique_answers(user_question, initial_answers, active_models, session)
-                yield {"type": "status", "data": "第三轮：根据评审修正答案..."}
-                revised_answers = await self._revise_answers(initial_answers, critiques, active_models, session)
-            else:
-                critiques, revised_answers = {}, initial_answers
-            
-            yield {"type": "status", "data": "最终决策..."}
-            final_decision, all_results = self._make_final_decision(initial_answers, critiques, revised_answers)
-            yield {"type": "final_result", "data": {"best_answer": final_decision, "process_details": all_results}}
-            
-    async def _generate_initial_answers(self, messages, models, session):
-        tasks = [model.generate(messages, session) for model in models]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return {models[i].name: str(res) if not isinstance(res, Exception) else f"API调用失败: {res}" for i, res in enumerate(results)}
+    """核心编排器：管理多模型协作"""
     
-    async def _critique_answers(self, question, answers, models, session):
-        pure_name_map = {m.name: m.name.split('::', 1)[1] for m in models}; reverse_name_map = {v: k for k, v in pure_name_map.items()}
-        tasks = []
-        for critic in models:
-            others_text = "".join([f"\n\n--- 来自模型 '{pure_name_map.get(n, n)}' 的答案 ---\n{a}" for n, a in answers.items() if n != critic.name])
-            if not others_text.strip(): continue
-            prompt = self._build_critique_prompt(question, others_text)
-            tasks.append((critic.name, critic.generate([{"role": "user", "content": prompt}], session)))
-        if not tasks: return {name: [] for name in answers.keys()}
-        results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
-        all_critiques = {name: [] for name in answers.keys()}
-        for i, (critic_name, _) in enumerate(tasks):
-            text = str(results[i]) if not isinstance(results[i], Exception) else f"评审失败:{results[i]}"
-            for critique in self._parse_critique(text, critic_name, reverse_name_map):
-                if critique.get('model_name') in all_critiques: all_critiques[critique['model_name']].append(critique)
-        return all_critiques
-
-    async def _revise_answers(self, initial_answers, critiques, models, session):
-        tasks = []
-        for model in models:
-            my_critiques = critiques.get(model.name, [])
-            if not my_critiques: tasks.append((model.name, _get_completed_future(initial_answers.get(model.name, ""))))
-            else:
-                prompt = self._build_revision_prompt(initial_answers.get(model.name, ""), my_critiques)
-                tasks.append((model.name, model.generate([{"role": "user", "content": prompt}], session)))
-        results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
-        return {name: str(res) if not isinstance(res, Exception) else f"修正失败:{res}" for (name, _), res in zip(tasks, results)}
-
-    def _make_final_decision(self, initial, critiques, revised):
-        scores = {n: sum(c.get('score', 0) for c in cl) for n, cl in critiques.items()} if critiques else {}
-        results = [{"model_name": n, "initial_answer": initial.get(n, "N/A"), "critiques_received": critiques.get(n, []), "revised_answer": revised.get(n, "N/A"), "total_score": scores.get(n, 0)} for n in initial.keys()]
-        results.sort(key=lambda x: x['total_score'], reverse=True)
-        if not results: return "无可用结果", []
-        best = results[0]
-        return best.get('revised_answer') or best.get('initial_answer') or "未能生成最终答案", results
-
-    def _build_critique_prompt(self, question: str, other_answers: str) -> str:
-        return f"""You are an expert AI Critic. Your task is to evaluate answers from other AI models for a given question.
+    async def process_query_stream(self, user_question: str, selected_models: List[str], 
+                                   history: List[Dict[str, str]]) -> AsyncGenerator[Dict[str, Any], None]:
+        """流式处理查询"""
         
-Question: "{question}"
+        yield {"type": "status", "data": "正在初始化模型..."}
+        
+        # 创建模型实例
+        active_models = []
+        for sm_id in selected_models:
+            parts = sm_id.split('::', 1)
+            if len(parts) != 2:
+                continue
+            provider_name, model_name = parts
+            provider_config = db.get_provider_by_name(provider_name)
+            if not provider_config:
+                continue
+            instance = create_model_instance(provider_config, model_name)
+            if instance:
+                active_models.append(instance)
+        
+        if not active_models:
+            yield {"type": "error", "data": "没有可用的模型"}
+            return
+        
+        messages = history + [{"role": "user", "content": user_question}]
+        
+        # === 第一轮：生成初始答案 ===
+        yield {"type": "status", "data": "第一轮：AI们正在思考答案..."}
+        
+        initial_answers = {}
+        tasks = [self._generate_answer(model, messages) for model in active_models]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for model, result in zip(active_models, results):
+            if isinstance(result, Exception):
+                initial_answers[model.name] = f"[生成失败: {result}]"
+            else:
+                initial_answers[model.name] = result
+            yield {
+                "type": "initial_answer_complete",
+                "model_name": model.name,
+                "answer": initial_answers[model.name]
+            }
+        
+        # 如果只有一个模型
+        if len(active_models) == 1:
+            single_model_name = active_models[0].name
+            yield {
+                "type": "final_result",
+                "data": {
+                    "best_answer": initial_answers[single_model_name],
+                    "process_details": [{
+                        "model_name": single_model_name,
+                        "initial_answer": initial_answers[single_model_name],
+                        "critiques_received": [],
+                        "revised_answer": initial_answers[single_model_name],
+                        "total_score": 0
+                    }]
+                }
+            }
+            return
+        
+        # === 第二轮：互相评审 ===
+        yield {"type": "status", "data": "第二轮：AI们正在互相评审..."}
+        
+        critiques = {m.name: [] for m in active_models}
+        critique_tasks = []
+        
+        for critic in active_models:
+            for target_model in active_models:
+                if critic.name == target_model.name:
+                    continue
+                critique_tasks.append(
+                    self._generate_critique(
+                        critic, target_model.name, user_question,
+                        initial_answers.get(target_model.name, "")
+                    )
+                )
+        
+        critique_results = await asyncio.gather(*critique_tasks, return_exceptions=True)
+        
+        task_idx = 0
+        for critic in active_models:
+            for target_model in active_models:
+                if critic.name == target_model.name:
+                    continue
+                result = critique_results[task_idx]
+                task_idx += 1
+                
+                if isinstance(result, Exception):
+                    continue
+                
+                critique_text, parsed = result
+                critiques[target_model.name].append(parsed)
+                
+                yield {
+                    "type": "critique_complete",
+                    "critic_name": critic.name,
+                    "target_model": target_model.name,
+                    "critique_text": critique_text,
+                    "critique_data": parsed
+                }
+        
+        # === 第三轮：修正答案 ===
+        yield {"type": "status", "data": "第三轮：AI们正在根据评审改进答案..."}
+        
+        revised_answers = {}
+        revision_tasks = []
+        
+        for model in active_models:
+            my_critiques = critiques.get(model.name, [])
+            if not my_critiques:
+                revised_answers[model.name] = initial_answers.get(model.name, "")
+            else:
+                revision_tasks.append((model.name, self._generate_revision(
+                    model, initial_answers.get(model.name, ""), my_critiques
+                )))
+        
+        if revision_tasks:
+            revision_results = await asyncio.gather(
+                *[task for _, task in revision_tasks],
+                return_exceptions=True
+            )
+            for (model_name, _), result in zip(revision_tasks, revision_results):
+                if isinstance(result, Exception):
+                    revised_answers[model_name] = initial_answers.get(model_name, "")
+                else:
+                    revised_answers[model_name] = result
+                yield {
+                    "type": "revision_complete",
+                    "model_name": model_name,
+                    "revised_answer": revised_answers[model_name]
+                }
+        
+        # === 最终决策 ===
+        yield {"type": "status", "data": "正在进行最终决策..."}
+        
+        best_answer, details = self._make_final_decision(initial_answers, critiques, revised_answers)
+        
+        yield {
+            "type": "final_result",
+            "data": {
+                "best_answer": best_answer,
+                "process_details": details
+            }
+        }
+    
+    async def _generate_answer(self, model, messages: List[Dict]) -> str:
+        """生成单个答案（阻塞式）"""
+        return await model.generate(messages)
+    
+    async def _generate_critique(self, critic_model, target_name: str, 
+                                 question: str, answer: str) -> tuple:
+        """生成评审"""
+        prompt = self._build_critique_prompt(question, target_name, answer)
+        messages = [{"role": "user", "content": prompt}]
+        critique_text = await critic_model.generate(messages)
+        parsed = self._parse_critique(critique_text, critic_model.name)
+        return (critique_text, parsed)
+    
+    async def _generate_revision(self, model, original: str, critiques: List[Dict]) -> str:
+        """生成修正"""
+        prompt = self._build_revision_prompt(original, critiques)
+        messages = [{"role": "user", "content": prompt}]
+        return await model.generate(messages)
+    
+    def _make_final_decision(self, initial: Dict, critiques: Dict, revised: Dict):
+        """最终决策"""
+        scores = {}
+        for model_name, critique_list in critiques.items():
+            total = sum(c.get('score', 0) for c in critique_list)
+            count = len(critique_list)
+            scores[model_name] = total / count if count > 0 else 0
+        
+        results = []
+        for name in initial.keys():
+            results.append({
+                "model_name": name,
+                "initial_answer": initial.get(name, ""),
+                "critiques_received": critiques.get(name, []),
+                "revised_answer": revised.get(name, initial.get(name, "")),
+                "total_score": scores.get(name, 0)
+            })
+        
+        results.sort(key=lambda x: x['total_score'], reverse=True)
+        best = results[0] if results else None
+        best_answer = best.get('revised_answer', '') if best else "无结果"
+        
+        return best_answer, results
+    
+    def _build_critique_prompt(self, question: str, target: str, answer: str) -> str:
+        """构建评审提示词 - v15.0严格批评版本"""
+        return f"""你是一个严格的AI评审员。你的任务是找出答案中的缺陷和不足，而不是夸奖。
 
-Here are the answers from other models:
-{other_answers}
+【用户问题】
+{question}
 
-Your task is to provide a structured critique for EACH model's answer. Use the following format, repeating it for every answer you see. Use '###' as a separator between critiques.
+【被评审的答案（来自'{target}'）】
+{answer}
 
-###
-模型名称: [The name of the model you are critiquing, e.g., 'deepseek-v2']
-评分: [An integer score from 1 to 10]
-优点: [List the strengths of the answer, e.g., 'comprehensive', 'well-structured']
-不足与改进建议: [List the weaknesses and suggest specific improvements]
-###
-"""
+【评审标准（每项0-3分，必须严格评分）】
 
-    def _build_revision_prompt(self, my_initial_answer: str, my_critiques: List[Dict]) -> str:
-        feedback_text = "".join([
-            f"""---
-Feedback from {c.get('critic_name', 'an anonymous critic')} (Score: {c.get('score', 'N/A')}):
-Strengths mentioned: {c.get('strengths', 'N/A')}
-Weaknesses and suggestions: {c.get('weaknesses', 'N/A')}
-"""
-            for c in my_critiques
-        ])
+1. **准确性 (Accuracy)** - 信息是否正确？
+   - 3分：完全准确，无错误
+   - 2分：基本准确，有1-2处小瑕疵
+   - 1分：存在明显错误或过时信息
+   - 0分：严重错误或完全不准确
 
-        return f"""You are an advanced AI model. You previously generated an answer which has now been reviewed by your peers. Your task is to revise your original answer based on the feedback to create a superior version.
+2. **完整性 (Completeness)** - 是否遗漏重要内容？
+   - 3分：全面覆盖，无遗漏
+   - 2分：覆盖主要内容，有小遗漏
+   - 1分：明显遗漏重要信息
+   - 0分：严重不完整或跑题
 
-Your Original Answer:
----
-{my_initial_answer}
----
+3. **清晰性 (Clarity)** - 表达是否清晰？结构是否合理？
+   - 3分：清晰明了，结构完美
+   - 2分：基本清晰，略有混乱
+   - 1分：表达模糊或逻辑混乱
+   - 0分：完全看不懂或极度啰嗦
 
-Feedback Received:
-{feedback_text}
----
+4. **实用性 (Usefulness)** - 是否对用户有实际帮助？
+   - 3分：非常实用，有具体建议
+   - 2分：有一定帮助
+   - 1分：泛泛而谈，缺乏实操性
+   - 0分：完全没用或误导用户
 
-Your Revision Task:
-Carefully analyze the feedback. Integrate the valid suggestions and correct the identified weaknesses. Your revised answer should be more accurate, comprehensive, and well-structured. Output ONLY the final, revised answer, without any conversational preamble.
-"""
+【评分要求】
+- 不要客气！普通答案应该在5-8分之间
+- 如果答案有明显缺陷，该维度直接给0-1分
+- 只有真正优秀的答案才能得10-12分
+- 评语必须包含：至少1个主要缺陷 + 至少2条具体改进建议
 
-    def _parse_critique(self, critique_text, critic_name, reverse_name_map):
-        critiques, pattern = [], re.compile(r"^\s*模型名称\s*[:：]\s*(.*?)\s*$", re.M | re.I)
-        for block in critique_text.split('###'):
-            if not block.strip(): continue
-            name_match = pattern.search(block)
-            if not name_match: continue
-            pure_name = name_match.group(1).strip().strip("'\"")
-            full_model_id = reverse_name_map.get(pure_name)
-            if not full_model_id: continue
-            data = {"critic_name": critic_name, "model_name": full_model_id, "score": 0, "strengths": "N/A", "weaknesses": "N/A"}
-            score = re.search(r"(?:评分|score)\s*[:：]\s*(\d+)", block, re.I); strengths = re.search(r"优点\s*[:：]([\s\S]*?)(?=不足|$)", block, re.I); weaknesses = re.search(r"不足(?:与改进建议)?\s*[:：]([\s\S]*)", block, re.I)
-            if score: data["score"] = int(score.group(1))
-            if strengths: data["strengths"] = strengths.group(1).strip()
-            if weaknesses: data["weaknesses"] = weaknesses.group(1).strip()
-            critiques.append(data)
-        return critiques
+【输出格式（严格按照此格式）】
+准确性: [0-3的数字]
+完整性: [0-3的数字]
+清晰性: [0-3的数字]
+实用性: [0-3的数字]
+总分: [四项相加的总和]
+评语: [必须指出具体缺陷，并给出改进建议，不要只说优点！]
+
+现在开始严格评审，不要手下留情！"""
+    
+    def _build_revision_prompt(self, original: str, critiques: List[Dict]) -> str:
+        """构建修订提示词 - v15.0针对性改进版本"""
+        feedback_details = []
+        for c in critiques:
+            critic_name = c.get('critic_name', 'Reviewer')
+            score = c.get('score', 0)
+            comment = c.get('comment', 'N/A')
+            accuracy = c.get('accuracy', 0)
+            completeness = c.get('completeness', 0)
+            clarity = c.get('clarity', 0)
+            usefulness = c.get('usefulness', 0)
+            
+            feedback_details.append(f"""
+评审员: {critic_name}
+总分: {score}/12 (准确性{accuracy}/3, 完整性{completeness}/3, 清晰性{clarity}/3, 实用性{usefulness}/3)
+评语: {comment}
+""")
+        
+        feedback = "\n".join(feedback_details)
+        
+        return f"""你需要根据评审意见改进你的答案。请注意：这不是让你重写答案，而是针对性地修复缺陷。
+
+【你的原始答案】
+{original}
+
+【收到的评审意见】
+{feedback}
+
+【改进要求】
+1. 仔细分析每个评审员指出的具体缺陷
+2. 如果准确性被扣分，检查并修正错误信息
+3. 如果完整性被扣分，补充遗漏的重要内容
+4. 如果清晰性被扣分，优化表达和结构
+5. 如果实用性被扣分，增加具体建议和实操指导
+
+【输出要求】
+- 只输出改进后的完整答案
+- 不要写"根据评审意见..."这样的元信息
+- 不要只是换个说法，要真正解决评审中指出的问题
+- 如果评审认为没有明显缺陷，可以保持原样或略微润色
+
+现在输出改进后的答案："""
+    
+    def _parse_critique(self, text: str, critic_name: str) -> Dict:
+        """解析评审结果"""
+        data = {
+            "critic_name": critic_name,
+            "accuracy": 0,
+            "completeness": 0,
+            "clarity": 0,
+            "usefulness": 0,
+            "score": 0,
+            "comment": ""
+        }
+        
+        # 使用更宽松的正则表达式匹配
+        acc = re.search(r"准确性\s*[:：]\s*(\d+)", text, re.I)
+        comp = re.search(r"完整性\s*[:：]\s*(\d+)", text, re.I)
+        clar = re.search(r"清晰性\s*[:：]\s*(\d+)", text, re.I)
+        use = re.search(r"实用性\s*[:：]\s*(\d+)", text, re.I)
+        total = re.search(r"总分\s*[:：]\s*(\d+)", text, re.I)
+        comment = re.search(r"评语\s*[:：](.*?)(?:\n\n|$)", text, re.I | re.DOTALL)
+        
+        if acc: data["accuracy"] = min(3, int(acc.group(1)))
+        if comp: data["completeness"] = min(3, int(comp.group(1)))
+        if clar: data["clarity"] = min(3, int(clar.group(1)))
+        if use: data["usefulness"] = min(3, int(use.group(1)))
+        
+        # 计算总分
+        if total: 
+            data["score"] = min(12, int(total.group(1)))
+        else: 
+            data["score"] = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
+        
+        if comment: 
+            data["comment"] = comment.group(1).strip()
+        else:
+            data["comment"] = "未提供评语"
+        
+        return data
 

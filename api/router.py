@@ -28,18 +28,18 @@ class ProviderModel(BaseModel):
 # --- 路由器实例 ---
 router = APIRouter()
 
-# --- 流式响应 ---
+# --- 流式响应生成器 ---
 async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str, None]:
     """生成器函数，用于流式返回处理事件。"""
     try:
         orch = Orchestrator()
         history_dicts = [msg.dict() for msg in request.history]
         async for event in orch.process_query_stream(request.question, request.selected_models, history_dicts):
-            yield f"data: {json.dumps(event)}\n\n"
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.01)
     except Exception as e:
         error_event = {"type": "error", "data": f"服务器内部错误: {e}"}
-        yield f"data: {json.dumps(error_event)}\n\n"
+        yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
 
 @router.post("/process")
 async def process_user_query_stream(request: QueryRequest):
@@ -49,7 +49,6 @@ async def process_user_query_stream(request: QueryRequest):
     if not request.selected_models:
         raise HTTPException(status_code=400, detail="必须选择至少一个模型")
     return StreamingResponse(stream_process_generator(request), media_type="text/event-stream")
-
 
 # --- Provider CRUD API ---
 @router.get("/providers", response_model=List[Dict[str, Any]])

@@ -1,21 +1,17 @@
-import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-import core.database
 from api.router import router as api_router
+import core.database as db
+from datetime import datetime
+import os
 
-async def startup_event():
-    """在服务器启动时，初始化数据库。"""
-    core.database.initialize_database()
+app = FastAPI(title="AI Model Factory v14.3")
 
-app = FastAPI(
-    title="AI模型聚合工厂 (v12.0 - Core Dump)",
-    on_startup=[startup_event]
-)
+# 判断是否为开发模式
+IS_DEV = os.getenv("ENV", "development") == "development"
 
-# 允许所有来源的跨域请求
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,19 +20,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 包含API路由
-app.include_router(api_router, prefix="/api", tags=["AI Factory"])
-
-# 挂载静态文件目录
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(api_router, prefix="/api", tags=["API"])
 
-@app.get("/", include_in_schema=False)
-async def root():
-    """根路径返回主页。"""
-    return FileResponse("static/index.html")
+@app.on_event("startup")
+async def startup_event():
+    """启动时初始化数据库"""
+    db.initialize_database()  # ← 修复：使用正确的函数名
+    print("✓ Database initialized successfully")
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    # 开发模式：使用时间戳，每次都是新的
+    # 生产模式：使用固定版本号，可以缓存
+    if IS_DEV:
+        cache_buster = str(int(datetime.now().timestamp()))
+    else:
+        cache_buster = "14.3"
+    
+    html_content = html_content.replace(
+        '<script src="/static/script.js"></script>',
+        f'<script src="/static/script.js?v={cache_buster}"></script>'
+    )
+    
+    return HTMLResponse(content=html_content)
 
 if __name__ == "__main__":
-    # 这是一个帮助信息，实际启动应通过uvicorn命令行
-    print("这是一个FastAPI应用。请使用以下命令启动：")
-    print("uvicorn main:app --host 0.0.0.0 --port 8000 --reload")
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
