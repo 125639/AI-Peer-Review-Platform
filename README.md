@@ -92,7 +92,7 @@ pip install -r requirements.txt
 
 万事俱备，只欠东风。运行下面的命令：
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 如果一切顺利（祈祷！），您会看到一行字，提示程序正在 `http://127.0.0.1:8000` 上运行。
 
