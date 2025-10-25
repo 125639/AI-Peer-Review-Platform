@@ -32,7 +32,7 @@
 这是它在我们“合作”下，最终顺利跑起来的样子（希望在您的电脑上也能如此！）：
 
 **1. 核心功能：并排对比模型回答**
-![并排对比模型回答](https://image.edupulse.me/i/2025/10/25/kghw1q.png)
+![并排对比模型回答](https://image.edupulse.me/i/2025/10/25/10lqs10.png)
 
 **2. 新增功能：模型总分详情**
 ![模型得分详情](https://image.edupulse.me/i/2025/10/25/kgi6pg.png)
