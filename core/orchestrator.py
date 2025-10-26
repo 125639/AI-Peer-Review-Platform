@@ -1,11 +1,8 @@
 import asyncio
-import logging
 import re
 from typing import List, Dict, Any, AsyncGenerator, Optional
 from .models import create_model_instance
 import core.database as db
-
-logger = logging.getLogger(__name__)
 
 class Orchestrator:
     async def process_query_stream(self, user_question: str, selected_models: List[str], 
@@ -135,7 +132,7 @@ class Orchestrator:
 
         if parsed.get("missing_fields"):
             missing_display = "、".join(parsed["missing_fields"])
-            logger.debug(
+            print(
                 f"⚠️ {critic_model.name} 在 {attempts} 次尝试后仍缺少字段: {missing_display}. "
                 "将使用当前解析结果继续流程。"
             )
@@ -281,17 +278,12 @@ class Orchestrator:
             "raw_text": text
         }
 
-        log_lines = [
-            "",
-            "=" * 60,
-            f"🔍 解析 {critic_name} 的评审输出",
-            "=" * 60,
-        ]
+        print(f"\n{'='*60}")
+        print(f"🔍 解析 {critic_name} 的评审输出")
+        print(f"{'='*60}")
         preview = text if len(text) < 800 else text[:800] + "..."
-        log_lines.extend([
-            f"原始文本 ({len(text)} 字符):\n{preview}",
-            "=" * 60,
-        ])
+        print(f"原始文本 ({len(text)} 字符):\n{preview}")
+        print(f"{'='*60}\n")
 
         field_patterns = [
             ("accuracy", [r"准确性\s*[:：]\s*(\d+)", r"准确性\s*(\d+)", r"accuracy\s*[:：]?\s*(\d+)"]),
@@ -306,11 +298,11 @@ class Orchestrator:
                 if match := re.search(pattern, text, re.I):
                     data[field] = min(3, int(match.group(1)))
                     found = True
-                    log_lines.append(f"✓ 找到{field}: {data[field]}")
+                    print(f"✓ 找到{field}: {data[field]}")
                     break
             if not found:
                 data["missing_fields"].append(field)
-                log_lines.append(f"✗ 未找到{field}评分")
+                print(f"✗ 未找到{field}评分")
 
         total_patterns = [r"总分\s*[:：]\s*(\d+)", r"总分\s*(\d+)", r"total\s*[:：]?\s*(\d+)"]
         total_found = False
@@ -318,19 +310,19 @@ class Orchestrator:
             if match := re.search(pattern, text, re.I):
                 data["score"] = min(12, int(match.group(1)))
                 total_found = True
-                log_lines.append(f"✓ 找到总分: {data['score']}")
+                print(f"✓ 找到总分: {data['score']}")
                 break
 
         if not total_found:
             data["score"] = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
             if 0 < data["score"] <= 12:
-                log_lines.append(
+                print(
                     f"✓ 计算总分: {data['score']} = {data['accuracy']}+{data['completeness']}+"
                     f"{data['clarity']}+{data['usefulness']}"
                 )
             else:
                 data["missing_fields"].append("total")
-                log_lines.append("✗ 无法确认总分")
+                print("✗ 无法确认总分")
         
         # 提取评语 - 多种模式尝试
         comment_found = False
@@ -392,14 +384,14 @@ class Orchestrator:
                 data["comment"] = f"模型 {critic_name} 未按要求提供详细评语。"
                 data["missing_fields"].append("comment")
 
-        log_lines.append(
-            f"最终评分: 准确{data['accuracy']} 完整{data['completeness']} "
+        print(
+            f"\n最终评分: 准确{data['accuracy']} 完整{data['completeness']} "
             f"清晰{data['clarity']} 实用{data['usefulness']} = {data['score']}/12"
         )
         if data.get("missing_fields"):
-            log_lines.append(f"⚠️ 缺少字段: {data['missing_fields']}")
-        log_lines.append("=" * 60)
-        logger.debug("\n".join(log_lines))
+            print(f"⚠️ 缺少字段: {data['missing_fields']}")
+        print(f"{'='*60}\n")
         
         return data
+
 

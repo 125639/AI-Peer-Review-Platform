@@ -116,3 +116,4 @@ def remove_prompt(prompt_id: int):
         raise HTTPException(404, "删除失败")
     return {"message": "删除成功"}
 
+

@@ -170,3 +170,4 @@ def delete_prompt(prompt_id: int) -> bool:
         conn.commit()
         return result
 
+
