@@ -180,3 +180,24 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 providers.db
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore database files
+*.db
+
+# Ignore text and markdown files
+*.txt
+*.md
+
+# Ignore HTML files
+*.html
+
+# Ignore log files
+*.log
+
+# Ignore environment files
+*.env
