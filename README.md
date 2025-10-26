@@ -101,6 +101,12 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 打开您的浏览器，在地址栏输入 `http://127.0.0.1:8000` 然后回车。
 
+
+
+#### 现在支持docker部署！
+docker pull safg/ai-peer-review-platform:latest
+docker run -d -p 8000:8000 --name my-review-app safg/ai-peer-review-platform:latest
+
 ---
 
 ### 最后，再次感谢和致歉
