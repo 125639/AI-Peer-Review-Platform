@@ -103,7 +103,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 
 
-#### 现在支持docker部署！
+### 现在支持docker部署！
 docker pull safg/ai-peer-review-platform:latest
 docker run -d -p 8000:8000 --name my-review-app safg/ai-peer-review-platform:latest
 
