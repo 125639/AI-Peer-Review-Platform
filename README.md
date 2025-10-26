@@ -1,5 +1,18 @@
 # 一个小小的AI模型对比工具（在AI的帮助下完成的练手项目）
 
+## 🆕 v16.0 重大更新：自定义提示词管理
+
+现在您可以完全自定义AI的评审和修订行为！新增功能：
+
+- ✏️ **创建提示词模板**：编写自己的评审和修订提示词
+- 🔄 **灵活切换**：随时切换不同的提示词模板
+- 📝 **随时编辑**：修改现有提示词以优化AI表现
+- 🎯 **场景专用**：为代码审查、论文评审、创意写作等不同场景创建专门的提示词
+
+**详细使用说明请查看：[提示词管理说明.md](./提示词管理说明.md)**
+
+---
+
 您好！
 
 非常非常感谢您愿意点开这个页面，并考虑尝试我写的这个小程序。
@@ -100,6 +113,43 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 #### 第6步：访问程序
 
 打开您的浏览器，在地址栏输入 `http://127.0.0.1:8000` 然后回车。
+
+---
+
+### 🐳 使用 Docker 运行
+
+如果您不想在本地安装 Python，也可以借助 Docker 快速启动：
+
+1. 请确认已安装 [Docker](https://docs.docker.com/get-docker/) 与 Docker Compose（Docker Desktop 已内置）。
+2. 在项目根目录执行构建并启动：
+
+    ```bash
+    docker compose up --build -d
+    ```
+
+    如需在启动时传入模型 API Key，可在 `.env` 文件中写入，例如：
+
+    ```bash
+    echo "OPENAI_API_KEY=sk-xxx" >> .env
+    echo "GOOGLE_API_KEY=xxx" >> .env
+    ```
+
+    Docker Compose 会自动加载 `.env` 文件。也可以直接在 `docker-compose.yml` 中的 `environment` 段落填写。
+
+3. 容器启动后，访问 `http://127.0.0.1:8000` 即可。
+4. 若需查看日志：
+
+    ```bash
+    docker compose logs -f
+    ```
+
+5. 停止并移除容器：
+
+    ```bash
+    docker compose down
+    ```
+
+默认镜像内不会开启热重载。如果希望调试代码，请直接在主机上修改文件后重新执行 `docker compose up --build`，或者自行修改 `docker-compose.yml` 启用卷挂载与 `uvicorn --reload`。
 
 ---
 

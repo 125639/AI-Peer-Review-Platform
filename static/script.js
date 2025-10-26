@@ -1,16 +1,20 @@
 /*
  * static/script.js
- * Version: 15.0.0 - 新增停止生成功能
+ * Version: 18.0.0 - 主题切换与界面增强
+ * 更新时间: 2025-02-08 10:00:00
  */
 
-console.log('Script v15.0.0 loaded with STOP feature');
+console.log('🚀 Script v18.0.0 loaded - Timestamp: 2025-02-08-10:00:00');
+console.log('✅ Prompt Management Feature Enabled');
+console.log('✅ Tab Switching Feature Enabled');
+console.log('✅ Theme Toggle & Sidebar Collapse Enabled');
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing v15.0.0...');
+    console.log('DOM loaded, initializing v18.0.0...');
     
     const API_BASE_URL = window.location.origin;
     let conversationHistory = [];
-    let currentReader = null; // 用于存储当前的 ReadableStreamDefaultReader
+    let currentReader = null;
     let isGenerating = false;
     
     // === DOM元素引用 ===
@@ -27,11 +31,132 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsModal = document.getElementById('details-modal');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const processDetailsContainer = document.getElementById('process-details-container');
+    const addPromptForm = document.getElementById('add-prompt-form');
+    const promptListDiv = document.getElementById('prompt-list');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeToggleLabel = themeToggleBtn ? themeToggleBtn.querySelector('span') : null;
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+    const bodyElement = document.body;
+
+    const THEME_STORAGE_KEY = 'ai-factory-theme';
+    const SIDEBAR_STORAGE_KEY = 'ai-factory-sidebar';
+
+    const storage = {
+        get(key) {
+            try {
+                return window.localStorage.getItem(key);
+            } catch (error) {
+                console.warn('Storage read failed:', error);
+                return null;
+            }
+        },
+        set(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+            } catch (error) {
+                console.warn('Storage write failed:', error);
+            }
+        }
+    };
+
+    function applyTheme(theme) {
+        const normalized = theme === 'light' ? 'light' : 'dark';
+        const isLight = normalized === 'light';
+        bodyElement.classList.toggle('light-theme', isLight);
+        storage.set(THEME_STORAGE_KEY, normalized);
+        if (themeToggleLabel) {
+            themeToggleLabel.textContent = isLight ? '亮色' : '暗色';
+        }
+        if (themeToggleBtn) {
+            const nextMode = isLight ? '暗色模式' : '亮色模式';
+            themeToggleBtn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+            themeToggleBtn.setAttribute('title', `切换为${nextMode}`);
+            themeToggleBtn.setAttribute('aria-label', `切换为${nextMode}`);
+        }
+        console.log(`Theme applied: ${normalized}`);
+    }
+
+    function toggleTheme() {
+        const nextTheme = bodyElement.classList.contains('light-theme') ? 'dark' : 'light';
+        applyTheme(nextTheme);
+    }
+
+    function applySidebarState(state) {
+        const collapsed = state === 'collapsed';
+        bodyElement.classList.toggle('sidebar-collapsed', collapsed);
+    storage.set(SIDEBAR_STORAGE_KEY, collapsed ? 'collapsed' : 'expanded');
+        if (sidebarToggleBtn) {
+            sidebarToggleBtn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+            sidebarToggleBtn.setAttribute('title', collapsed ? '展开侧边栏' : '收起侧边栏');
+            sidebarToggleBtn.setAttribute('aria-label', collapsed ? '展开侧边栏' : '收起侧边栏');
+        }
+        console.log(`Sidebar state: ${collapsed ? 'collapsed' : 'expanded'}`);
+    }
+
+    const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    const storedTheme = storage.get(THEME_STORAGE_KEY) || (systemPrefersLight ? 'light' : 'dark');
+    applyTheme(storedTheme);
+
+    const storedSidebar = storage.get(SIDEBAR_STORAGE_KEY) || 'expanded';
+    applySidebarState(storedSidebar);
+
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', () => {
+            const collapsed = bodyElement.classList.contains('sidebar-collapsed');
+            applySidebarState(collapsed ? 'expanded' : 'collapsed');
+        });
+    }
     
     console.log('Elements loaded:', { 
         submitBtn: !!submitBtn,
         stopBtn: !!stopBtn,
-        questionInput: !!questionInput
+        questionInput: !!questionInput,
+        promptListDiv: !!promptListDiv,
+        addPromptForm: !!addPromptForm
+    });
+
+    console.log('Control availability:', {
+        themeToggle: !!themeToggleBtn,
+        sidebarToggle: !!sidebarToggleBtn
+    });
+    
+    // 检查标签页按钮是否存在
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    console.log('Tab buttons found:', tabButtons.length);
+    tabButtons.forEach((btn, index) => {
+        console.log(`Tab button ${index}:`, btn.dataset.tab, btn.textContent.trim());
+    });
+    
+    // === 标签页切换 ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        console.log('Adding click listener to tab:', btn.dataset.tab);
+        btn.addEventListener('click', () => {
+            const tabName = btn.dataset.tab;
+            console.log('Tab clicked:', tabName);
+            
+            // 移除所有按钮的激活状态
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                console.log('Removing active from:', content.id);
+                content.classList.remove('active');
+            });
+            
+            // 显示选中的标签页
+            const targetTab = document.getElementById(`${tabName}-tab`);
+            if (targetTab) {
+                targetTab.classList.add('active');
+                console.log('Tab activated:', tabName, 'Display:', window.getComputedStyle(targetTab).display);
+            } else {
+                console.error('Tab not found:', `${tabName}-tab`);
+            }
+        });
     });
     
     // === 辅助函数 ===
@@ -43,8 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/>/g, "&gt;")
             .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
             .replace(/\*(.*?)\*/g, "<em>$1</em>")
-            .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-900 p-2 rounded-md my-2 text-sm overflow-x-auto"><code>$1</code></pre>')
-            .replace(/`(.*?)`/g, '<code class="bg-gray-900 px-1 rounded-sm">$1</code>')
+            .replace(/```([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>')
+            .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
             .replace(/\n/g, "<br>");
     }
     
@@ -96,13 +221,154 @@ document.addEventListener('DOMContentLoaded', () => {
         chatLog.scrollTop = chatLog.scrollHeight;
     }
     
+    // === 提示词管理功能 ===
+    async function loadPrompts() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/prompts`);
+            const prompts = await response.json();
+            renderPromptList(prompts);
+        } catch (error) {
+            console.error('Failed to load prompts:', error);
+        }
+    }
+    
+    function renderPromptList(prompts) {
+        promptListDiv.innerHTML = prompts.map(prompt => `
+            <div class="prompt-item ${prompt.is_active ? 'active' : ''}" data-id="${prompt.id}">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="font-bold text-lg">${escapeHtml(prompt.name)}</h4>
+                        ${prompt.is_active ? '<span class="text-xs text-green-400">✓ 当前使用</span>' : ''}
+                    </div>
+                    <div class="flex gap-2">
+                        ${!prompt.is_active ? `<button onclick="activatePrompt(${prompt.id})" class="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded">启用</button>` : ''}
+                        <button onclick="editPrompt(${prompt.id})" class="text-xs px-2 py-1 bg-yellow-600 hover:bg-yellow-700 rounded">编辑</button>
+                        <button onclick="deletePrompt(${prompt.id})" class="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 rounded">删除</button>
+                    </div>
+                </div>
+                <details class="text-sm">
+                    <summary class="cursor-pointer text-muted hover:text-secondary">查看详情</summary>
+                    <div class="mt-2 space-y-2">
+                        <div>
+                            <p class="text-muted text-xs mb-1">评审提示词:</p>
+                            <pre class="code-block text-xs">${escapeHtml(prompt.critique_prompt)}</pre>
+                        </div>
+                        <div>
+                            <p class="text-muted text-xs mb-1">修订提示词:</p>
+                            <pre class="code-block text-xs">${escapeHtml(prompt.revision_prompt)}</pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        `).join('');
+    }
+    
+    window.activatePrompt = async function(promptId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/prompts/${promptId}/activate`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                await loadPrompts();
+                alert('提示词已激活！');
+            }
+        } catch (error) {
+            console.error('Failed to activate prompt:', error);
+            alert('激活失败');
+        }
+    };
+    
+    window.editPrompt = async function(promptId) {
+        const prompts = await (await fetch(`${API_BASE_URL}/api/prompts`)).json();
+        const prompt = prompts.find(p => p.id === promptId);
+        if (!prompt) return;
+        
+        const name = window.prompt('提示词名称:', prompt.name);
+        if (!name) return;
+        
+        const critiquePrompt = window.prompt('评审提示词 (使用{question}、{target}、{answer}作为占位符):', prompt.critique_prompt);
+        if (!critiquePrompt) return;
+        
+        const revisionPrompt = window.prompt('修订提示词 (使用{original}、{feedback}作为占位符):', prompt.revision_prompt);
+        if (!revisionPrompt) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/prompts/${promptId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    critique_prompt: critiquePrompt,
+                    revision_prompt: revisionPrompt
+                })
+            });
+            if (response.ok) {
+                await loadPrompts();
+                alert('更新成功！');
+            }
+        } catch (error) {
+            console.error('Failed to update prompt:', error);
+            alert('更新失败');
+        }
+    };
+    
+    window.deletePrompt = async function(promptId) {
+        if (!confirm('确定要删除这个提示词吗？')) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/prompts/${promptId}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                await loadPrompts();
+                alert('删除成功！');
+            } else {
+                const error = await response.json();
+                alert(error.detail || '删除失败');
+            }
+        } catch (error) {
+            console.error('Failed to delete prompt:', error);
+            alert('删除失败');
+        }
+    };
+    
+    addPromptForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(addPromptForm);
+        const data = {
+            name: formData.get('name'),
+            critique_prompt: formData.get('critique_prompt'),
+            revision_prompt: formData.get('revision_prompt')
+        };
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/prompts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('提示词添加成功！');
+                addPromptForm.reset();
+                await loadPrompts();
+            } else {
+                const error = await response.json();
+                alert(error.detail || '添加失败');
+            }
+        } catch (error) {
+            console.error('Failed to add prompt:', error);
+            alert('添加失败，请检查网络连接');
+        }
+    });
+    
     // === 渲染服务商列表（可展开编辑） ===
     function renderProviderList(providers) {
         console.log('Rendering provider list, count:', providers.length);
         providerListDiv.innerHTML = "";
         
         if (providers.length === 0) {
-            providerListDiv.innerHTML = '<p class="text-xs text-gray-500 p-2">尚未添加任何服务商</p>';
+            providerListDiv.innerHTML = '<p class="text-xs text-muted p-2">尚未添加任何服务商</p>';
             return;
         }
         
@@ -110,24 +376,27 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Creating provider card ${index + 1}:`, p.name);
             
             const wrapper = document.createElement('div');
-            wrapper.className = 'provider-item bg-gray-700/50 rounded-lg mb-2';
+            wrapper.className = 'provider-item mb-2';
             
             // 头部（可点击展开）
             const header = document.createElement('div');
-            header.className = 'flex justify-between items-center p-2 cursor-pointer hover:bg-gray-600/50 transition-colors rounded-t-lg';
+            header.className = 'provider-header';
             header.innerHTML = `
                 <div>
                     <span class="font-semibold text-sm text-cyan-400">${escapeHtml(p.name)}</span>
-                    <span class="text-xs text-gray-400 ml-2">(${p.type})</span>
+                    <span class="text-xs text-muted ml-2">(${p.type})</span>
                 </div>
-                <span class="text-gray-500 text-xs transition-transform arrow-icon">编辑 ▼</span>
+                <span class="text-muted text-xs flex items-center gap-1">
+                    <span class="header-arrow transition-transform">▼</span>
+                    <span class="toggle-label">展开</span>
+                </span>
             `;
             
             // 编辑表单（默认隐藏）
             const form = document.createElement('form');
-            form.className = 'edit-form hidden p-3 border-t border-gray-600 space-y-2';
+            form.className = 'edit-provider-form provider-body hidden space-y-2';
             form.innerHTML = `
-                <input name="name" value="${escapeHtml(p.name)}" class="form-input text-sm bg-gray-600 cursor-not-allowed" readonly title="名称不可修改">
+                <input name="name" value="${escapeHtml(p.name)}" class="form-input text-sm cursor-not-allowed opacity-80" readonly title="名称不可修改">
                 <select name="type" class="form-input text-sm">
                     <option value="OpenAI" ${p.type === 'OpenAI' ? 'selected' : ''}>OpenAI 兼容型</option>
                     <option value="Gemini" ${p.type === 'Gemini' ? 'selected' : ''}>Google Gemini</option>
@@ -146,15 +415,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 直接绑定事件
             header.addEventListener('click', function() {
-                const arrow = this.querySelector('.arrow-icon');
+                const label = this.querySelector('.toggle-label');
                 const isHidden = form.classList.contains('hidden');
                 
                 if (isHidden) {
                     form.classList.remove('hidden');
-                    arrow.style.transform = 'rotate(180deg)';
+                    wrapper.classList.add('open');
+                    if (label) label.textContent = '收起';
                 } else {
                     form.classList.add('hidden');
-                    arrow.style.transform = 'rotate(0deg)';
+                    wrapper.classList.remove('open');
+                    if (label) label.textContent = '展开';
                 }
             });
             
@@ -232,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelListContainer.innerHTML = "";
         
         if (providers.length === 0) {
-            modelListContainer.innerHTML = '<p class="text-xs text-gray-500 p-2">无可用模型</p>';
+            modelListContainer.innerHTML = '<p class="text-xs text-muted p-2">无可用模型</p>';
             return;
         }
         
@@ -243,10 +514,10 @@ document.addEventListener('DOMContentLoaded', () => {
             models.forEach(modelName => {
                 const modelIdentifier = `${provider.name}::${modelName}`;
                 const label = document.createElement('label');
-                label.className = 'flex items-center space-x-2 p-1.5 rounded-md cursor-pointer hover:bg-gray-700 transition-colors';
+                label.className = 'model-option';
                 label.innerHTML = `
-                    <input type="checkbox" value="${escapeHtml(modelIdentifier)}" class="model-checkbox form-checkbox h-4 w-4 bg-gray-600 border-gray-500 text-purple-500 focus:ring-purple-500">
-                    <span class="text-xs text-gray-300">${escapeHtml(provider.name)} - ${escapeHtml(modelName)}</span>
+                    <input type="checkbox" value="${escapeHtml(modelIdentifier)}" class="model-checkbox">
+                    <span class="text-xs text-secondary">${escapeHtml(provider.name)} - ${escapeHtml(modelName)}</span>
                 `;
                 modelListContainer.appendChild(label);
             });
@@ -314,6 +585,9 @@ document.addEventListener('DOMContentLoaded', () => {
             providerListDiv.innerHTML = errorMsg;
             modelListContainer.innerHTML = errorMsg;
         }
+        
+        // 同时加载提示词列表
+        await loadPrompts();
     }
     
     // === 提交问题 ===
@@ -347,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 添加临时助手气泡
         const assistantBubble = document.createElement('div');
         assistantBubble.className = 'chat-bubble assistant-bubble mt-4';
-        assistantBubble.innerHTML = '<span class="italic text-gray-400">正在连接服务器...</span>';
+    assistantBubble.innerHTML = '<span class="italic text-muted">正在连接服务器...</span>';
         chatLog.appendChild(assistantBubble);
         chatLog.scrollTop = chatLog.scrollHeight;
         
@@ -390,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const event = JSON.parse(part.substring(6));
                             
                             if (event.type === 'status') {
-                                assistantBubble.innerHTML = `<span class="italic text-gray-400">${escapeHtml(event.data)}</span>`;
+                                assistantBubble.innerHTML = `<span class="italic text-muted">${escapeHtml(event.data)}</span>`;
                             } else if (event.type === 'final_result') {
                                 finalAnswer = event.data.best_answer;
                                 finalDetails = event.data.process_details || [];
@@ -459,22 +733,22 @@ document.addEventListener('DOMContentLoaded', () => {
         processDetailsContainer.innerHTML = "";
         
         if (!details || details.length === 0) {
-            processDetailsContainer.innerHTML = '<p class="text-gray-500">没有详细过程信息。</p>';
+            processDetailsContainer.innerHTML = '<p class="text-muted">没有详细过程信息。</p>';
             return;
         }
         
         details.forEach(detail => {
             const wrapper = document.createElement('div');
-            wrapper.className = 'bg-gray-800/50 p-4 rounded-lg border border-gray-700 mb-4 collapse-wrapper';
+            wrapper.className = 'panel-card p-4 mb-4 collapse-wrapper';
             
             const scoreClass = detail.total_score >= 10 ? 'text-green-400' : 
                               detail.total_score >= 7 ? 'text-yellow-400' : 'text-red-400';
             
-            let critiquesHtml = '<p class="text-xs text-gray-500">没有收到有效的评审意见。</p>';
+            let critiquesHtml = '<p class="text-xs text-muted">没有收到有效的评审意见。</p>';
             if (detail.critiques_received && detail.critiques_received.length > 0) {
                 critiquesHtml = detail.critiques_received.map(c => `
-                    <div class="mt-2 p-3 bg-gray-700/50 rounded-md">
-                        <p class="text-sm">
+                    <div class="mt-2 answer-block space-y-2">
+                        <p class="text-sm text-secondary">
                             <strong>评审员:</strong> ${escapeHtml(c.critic_name)} | 
                             <strong class="ml-2">总分:</strong> ${c.score}/12
                         </p>
@@ -484,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="dimension-score score-${c.clarity || 0}">清晰性: ${c.clarity || 0}/3</span>
                             <span class="dimension-score score-${c.usefulness || 0}">实用性: ${c.usefulness || 0}/3</span>
                         </div>
-                        <p class="text-xs mt-2"><strong>评语:</strong> ${escapeHtml(c.comment || 'N/A')}</p>
+                        <p class="text-xs text-secondary"><strong>评语:</strong> ${escapeHtml(c.comment || 'N/A')}</p>
                     </div>
                 `).join('');
             }
@@ -494,20 +768,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h3 class="text-lg font-bold text-cyan-400">${escapeHtml(detail.model_name)}</h3>
                     <span class="text-md font-semibold ${scoreClass}">总分: ${detail.total_score.toFixed(1)}/12</span>
                 </div>
-                <div class="collapsible-content mt-3 border-t border-gray-600 pt-3 text-gray-300 text-sm">
+                <div class="collapsible-content mt-3 border-t border-soft pt-3 text-secondary text-sm">
                     <div class="mb-4">
-                        <h4 class="font-semibold mb-1 text-gray-400">1. 初始答案</h4>
-                        <div class="p-3 bg-gray-900/40 rounded prose prose-invert max-w-none text-sm">
+                        <h4 class="font-semibold mb-1 text-muted">1. 初始答案</h4>
+                        <div class="answer-block prose max-w-none text-sm">
                             ${markdownToHtml(detail.initial_answer)}
                         </div>
                     </div>
                     <div class="mb-4">
-                        <h4 class="font-semibold mb-1 text-gray-400">2. 收到的评审</h4>
+                        <h4 class="font-semibold mb-1 text-muted">2. 收到的评审</h4>
                         ${critiquesHtml}
                     </div>
                     <div>
-                        <h4 class="font-semibold mb-1 text-gray-400">3. 修正后答案</h4>
-                        <div class="p-3 bg-gray-900/40 rounded prose prose-invert max-w-none text-sm">
+                        <h4 class="font-semibold mb-1 text-muted">3. 修正后答案</h4>
+                        <div class="answer-block prose max-w-none text-sm">
                             ${markdownToHtml(detail.revised_answer)}
                         </div>
                     </div>
@@ -558,6 +832,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === 初始化 ===
     loadAndRenderAll();
-    console.log('Initialization complete v15.0.0');
+    console.log('Initialization complete v16.0.0');
 });
 

@@ -1,0 +1,56 @@
+🔴 紧急：浏览器正在使用旧版缓存！
+
+控制台显示：Script v15.0.0 loaded with STOP feature
+实际版本应该是：Script v16.0.0 loaded with Prompt Management
+
+这就是为什么标签页切换不工作的原因！
+
+=== 立即执行这些步骤 ===
+
+方法 1：硬刷新（最简单）
+1. 按 Ctrl+Shift+R （Windows）强制刷新
+2. 或者按 Ctrl+F5
+
+方法 2：完全清除缓存（推荐）
+1. 按 Ctrl+Shift+Delete
+2. 选择"缓存的图片和文件"
+3. 时间范围选择"全部时间"
+4. 点击"清除数据"
+5. 关闭并重新打开浏览器
+
+方法 3：使用无痕模式
+1. 按 Ctrl+Shift+N 打开无痕窗口
+2. 访问 http://127.0.0.1:8000
+3. 查看是否显示 v16.0.0
+
+方法 4：手动禁用缓存
+1. 打开 F12 开发者工具
+2. 点击右上角的 ⚙️ 设置
+3. 勾选 "Disable cache (while DevTools is open)"
+4. 保持 F12 开启
+5. 按 Ctrl+R 刷新
+
+方法 5：重启服务器并清除缓存
+PowerShell 中执行：
+1. 停止当前服务器（Ctrl+C）
+2. 运行：
+   cd "d:\shiyan\新建文件夹\AI-Peer-Review-Platform"
+   uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+3. 用新端口访问：http://127.0.0.1:8001
+
+=== 验证缓存已清除 ===
+
+刷新后，控制台应该显示：
+✅ Script v16.0.0 loaded with Prompt Management
+✅ DOM loaded, initializing v16.0.0...
+✅ Tab buttons found: 2
+
+如果看到这些，就说明缓存已清除！
+
+=== 快速测试命令 ===
+
+在控制台运行：
+document.querySelector('[data-tab="prompts"]').click();
+
+如果返回 undefined，说明还是旧版本！
+如果标签页切换了，说明缓存已清除！
