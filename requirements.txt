@@ -4,4 +4,4 @@ aiohttp
 openai
 google-generativeai
 python-dotenv
-
+packaging
