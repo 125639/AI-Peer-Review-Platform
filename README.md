@@ -68,7 +68,7 @@
 
 3.  **创建“隔离区”** (`venv`文件夹):
     ```bash
-    python -m venv venv
+    python3 -m venv venv
     ```
 
 4.  **进入“隔离区”**：
