@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let conversationHistory = [];
     let currentReader = null;
     let isGenerating = false;
+    let pendingOcrText = null;
+    let selectedImageFile = null;
     
     // === DOM元素引用 ===
     const addProviderForm = document.getElementById('add-provider-form');
@@ -32,13 +34,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const processDetailsContainer = document.getElementById('process-details-container');
     const addPromptForm = document.getElementById('add-prompt-form');
     const promptListDiv = document.getElementById('prompt-list');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIconSun = document.getElementById('theme-icon-sun');
+    const themeIconMoon = document.getElementById('theme-icon-moon');
+    const themeText = document.getElementById('theme-text');
+    const imageInput = document.getElementById('image-input');
+    const ocrModelSelect = document.getElementById('ocr-model-select');
+    const ocrBtn = document.getElementById('ocr-btn');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const deleteImageBtn = document.getElementById('delete-image-btn');
+    const uploadLabel = document.getElementById('upload-label');
     
     console.log('Elements loaded:', { 
         submitBtn: !!submitBtn,
         stopBtn: !!stopBtn,
         questionInput: !!questionInput,
         promptListDiv: !!promptListDiv,
-        addPromptForm: !!addPromptForm
+        addPromptForm: !!addPromptForm,
+        imagePreview: !!imagePreview
     });
     
     // 检查标签页按钮是否存在
@@ -55,17 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const tabName = btn.dataset.tab;
             console.log('Tab clicked:', tabName);
             
-            // 移除所有按钮的激活状态
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             
-            // 隐藏所有标签页内容
             document.querySelectorAll('.tab-content').forEach(content => {
                 console.log('Removing active from:', content.id);
                 content.classList.remove('active');
             });
-            
-            // 显示选中的标签页
+        
             const targetTab = document.getElementById(`${tabName}-tab`);
             if (targetTab) {
                 targetTab.classList.add('active');
@@ -75,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-    
+
     // === 辅助函数 ===
     function markdownToHtml(text) {
         if (!text) return '';
@@ -89,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/`(.*?)`/g, '<code class="bg-gray-900 px-1 rounded-sm">$1</code>')
             .replace(/\n/g, "<br>");
     }
-    
+
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -112,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingSpinner.classList.toggle('hidden', !isLoading);
         submitIcon.classList.toggle('hidden', isLoading);
     }
-    
+
     // === 停止生成 ===
     function stopGeneration() {
         console.log('Stop button clicked');
@@ -130,14 +144,13 @@ document.addEventListener('DOMContentLoaded', () => {
         isGenerating = false;
         toggleLoading(false);
         
-        // 在聊天中显示停止消息
         const stopMessage = document.createElement('div');
         stopMessage.className = 'chat-bubble assistant-bubble mt-4';
         stopMessage.innerHTML = '<span class="italic text-yellow-400">⚠️ 生成已被用户停止</span>';
         chatLog.appendChild(stopMessage);
         chatLog.scrollTop = chatLog.scrollHeight;
     }
-    
+
     // === 提示词管理功能 ===
     async function loadPrompts() {
         try {
@@ -435,6 +448,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // === 渲染 OCR 模型下拉 ===
+    function renderOcrModelOptions(providers) {
+        if (!ocrModelSelect) return;
+        const options = ['<option value="">选择OCR模型</option>'];
+        providers.forEach(provider => {
+            const models = (provider.original_models || '').split(',').map(m => m.trim()).filter(Boolean);
+            models.forEach(modelName => {
+                const id = `${provider.name}::${modelName}`;
+                options.push(`<option value="${escapeHtml(id)}">${escapeHtml(provider.name)} - ${escapeHtml(modelName)}</option>`);
+            });
+        });
+        ocrModelSelect.innerHTML = options.join('');
+    }
     
     // === 添加服务商表单 ===
     if (addProviderForm) {
@@ -491,6 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const providers = await response.json();
             renderProviderList(providers);
             renderModelSelection(providers);
+            renderOcrModelOptions(providers);
         } catch (error) {
             console.error('Load error:', error);
             const errorMsg = `<p class="text-red-500 p-2">加载失败: ${error.message}</p>`;
@@ -544,7 +572,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     question: question,
                     selected_models: selectedModels,
-                    history: conversationHistory.slice(0, -1)
+                    history: conversationHistory.slice(0, -1),
+                    ocr_text: pendingOcrText || null
                 })
             });
             
@@ -637,7 +666,115 @@ document.addEventListener('DOMContentLoaded', () => {
             currentReader = null;
             toggleLoading(false);
             chatLog.scrollTop = chatLog.scrollHeight;
+            // 一次提交后清空待发送的 OCR 文本和图片
+            pendingOcrText = null;
+            clearImageSelection();
         }
+    }
+
+    // === 图片处理函数 ===
+    function handleImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            alert('请选择一个图片文件。');
+            return;
+        }
+        selectedImageFile = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imagePreview.src = e.target.result;
+            imagePreviewContainer.classList.remove('hidden');
+            uploadLabel.classList.add('hidden'); // 隐藏上传按钮
+        };
+        reader.readAsDataURL(file);
+        
+        console.log('选中图片:', file.name, file.type, file.size);
+    }
+
+    function clearImageSelection() {
+        selectedImageFile = null;
+        imageInput.value = ''; // 重置 file input
+        imagePreview.src = '';
+        imagePreviewContainer.classList.add('hidden');
+        uploadLabel.classList.remove('hidden'); // 恢复上传按钮
+        console.log('图片已清除');
+    }
+
+    // === OCR 处理逻辑 ===
+    if (imageInput) {
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) {
+                handleImageFile(file);
+            }
+        });
+    }
+
+    if (deleteImageBtn) {
+        deleteImageBtn.addEventListener('click', clearImageSelection);
+    }
+
+    // 粘贴图片逻辑
+    if (questionInput) {
+        questionInput.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (const item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    if (blob) {
+                        handleImageFile(blob);
+                        e.preventDefault(); // 阻止默认的粘贴行为
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    async function uploadAndRecognizeImage() {
+        if (!selectedImageFile) {
+            alert('请先选择一张图片');
+            return;
+        }
+        const ocrModel = ocrModelSelect ? ocrModelSelect.value : '';
+        if (!ocrModel) {
+            alert('请选择一个OCR模型');
+            return;
+        }
+        try {
+            ocrBtn && (ocrBtn.disabled = true);
+            ocrBtn && (ocrBtn.textContent = '识别中...');
+            const form = new FormData();
+            form.append('file', selectedImageFile);
+            form.append('ocr_model', ocrModel);
+            const resp = await fetch(`${API_BASE_URL}/api/ocr`, { method: 'POST', body: form });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            pendingOcrText = (data && data.ocr_text) ? String(data.ocr_text) : '';
+            if (pendingOcrText) {
+                alert('图片识别完成，结果已加入上下文');
+            } else {
+                alert('未识别到文字或结果为空');
+            }
+        } catch (e) {
+            console.error('OCR error:', e);
+            alert(`OCR 失败: ${e.message}`);
+        } finally {
+            if (ocrBtn) {
+                ocrBtn.disabled = false;
+                ocrBtn.textContent = '识别图片';
+            }
+        }
+    }
+
+    if (ocrBtn) {
+        ocrBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uploadAndRecognizeImage();
+        });
     }
     
     // === 渲染详情 ===
@@ -741,10 +878,75 @@ document.addEventListener('DOMContentLoaded', () => {
             detailsModal.classList.remove('active');
         }
     });
+
+    // === 侧边栏和主题切换 ===
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        // 同步设置到 <html> 和 <body>，确保 Tailwind 和自定义样式都能匹配到 .dark 祖先
+        document.documentElement.classList.toggle('dark', isDark);
+        if (document.body) document.body.classList.toggle('dark', isDark);
+        if (themeIconSun) themeIconSun.classList.toggle('hidden', isDark);
+        if (themeIconMoon) themeIconMoon.classList.toggle('hidden', !isDark);
+    // 显示当前主题文字（暗色/亮色）
+    if (themeText) themeText.textContent = isDark ? '暗色' : '亮色';
+        // 诊断日志（可帮助排查主题未变化的问题）
+        console.debug('[theme]', {
+            applied: theme,
+            htmlHasDark: document.documentElement.classList.contains('dark'),
+            bodyHasDark: document.body ? document.body.classList.contains('dark') : false
+        });
+    }
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+    }
+
+    function updateSidebarTogglePosition() {
+        if (!sidebar || !sidebarToggle) return;
+        const collapsed = sidebar.classList.contains('collapsed');
+        if (collapsed) {
+            sidebarToggle.style.left = '0.75rem';
+            if (sidebarToggleIcon) {
+                sidebarToggleIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>';
+            }
+        } else {
+            const width = sidebar.getBoundingClientRect().width;
+            const offset = Math.max(width - 24, 16);
+            sidebarToggle.style.left = `${offset}px`;
+            if (sidebarToggleIcon) {
+                sidebarToggleIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>';
+            }
+        }
+    }
+
+    if (sidebar && sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            updateSidebarTogglePosition();
+        });
+        updateSidebarTogglePosition();
+        if (typeof ResizeObserver !== 'undefined') {
+            const observer = new ResizeObserver(() => updateSidebarTogglePosition());
+            observer.observe(sidebar);
+        } else {
+            window.addEventListener('resize', updateSidebarTogglePosition);
+        }
+    } else if (sidebarToggle) {
+        sidebarToggle.classList.add('hidden');
+    }
     
     // === 初始化 ===
+    // 主题初始化
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    applyTheme(savedTheme);
+    
     loadAndRenderAll();
-    console.log('Initialization complete v16.0.0');
+    console.log('Initialization complete v17.0.0');
 });
 
 

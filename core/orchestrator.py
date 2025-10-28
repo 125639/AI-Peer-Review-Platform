@@ -6,7 +6,7 @@ import core.database as db
 
 class Orchestrator:
     async def process_query_stream(self, user_question: str, selected_models: List[str], 
-                                   history: List[Dict[str, str]]) -> AsyncGenerator[Dict[str, Any], None]:
+                                   history: List[Dict[str, str]], ocr_text: Optional[str] = None) -> AsyncGenerator[Dict[str, Any], None]:
         yield {"type": "status", "data": "正在初始化模型..."}
         
         active_models = []
@@ -24,7 +24,16 @@ class Orchestrator:
             yield {"type": "error", "data": "没有可用的模型"}
             return
         
-        messages = history + [{"role": "user", "content": user_question}]
+        # 如果有OCR文本，将其与用户问题合并，作为更丰富的上下文
+        if ocr_text and ocr_text.strip():
+            combined_question = (
+                f"以下是图片识别得到的文字内容：\n{ocr_text.strip()}\n\n"
+                f"请结合以上识别文本回答：{user_question}"
+            )
+        else:
+            combined_question = user_question
+
+        messages = history + [{"role": "user", "content": combined_question}]
         
         yield {"type": "status", "data": "第一轮：生成初始答案..."}
         
@@ -145,10 +154,14 @@ class Orchestrator:
         return await model.generate([{"role": "user", "content": prompt}])
     
     def _make_final_decision(self, initial: Dict, critiques: Dict, revised: Dict):
-        scores = {
-            name: sum(c.get('score', 0) for c in clist) / len(clist) if clist else 0
-            for name, clist in critiques.items()
-        }
+        scores = {}
+        for name, clist in critiques.items():
+            # 过滤掉无效的、带有错误的评审
+            valid_critiques = [c for c in clist if not c.get("error")]
+            if valid_critiques:
+                scores[name] = sum(c.get('score', 0) for c in valid_critiques) / len(valid_critiques)
+            else:
+                scores[name] = 0
         
         results = [
             {
@@ -266,6 +279,24 @@ class Orchestrator:
 输出改进后的答案:"""
     
     def _parse_critique(self, text: str, critic_name: str) -> Dict:
+        # 检查是否为模型返回的错误信息
+        if text.strip().startswith("[Error:") or "Error code:" in text:
+            print(f"\n{'='*60}")
+            print(f"🔍 解析 {critic_name} 的评审输出")
+            print(f"{'='*60}")
+            preview = text if len(text) < 800 else text[:800] + "..."
+            print(f"原始文本 ({len(text)} 字符):\n{preview}")
+            print(f"{'='*60}\n")
+            print(f"⚠️ 检测到模型返回错误，该次评审将被忽略。")
+            print(f"{'='*60}\n")
+            return {
+                "critic_name": critic_name,
+                "error": True,
+                "raw_text": text,
+                "comment": f"模型返回错误: {text}",
+                "score": 0, "accuracy": 0, "completeness": 0, "clarity": 0, "usefulness": 0
+            }
+
         data = {
             "critic_name": critic_name,
             "accuracy": 0,

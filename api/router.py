@@ -1,11 +1,15 @@
 import asyncio
 import json
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from core.orchestrator import Orchestrator
 import core.database as db
+import base64
+import mimetypes
+import openai
+import google.generativeai as genai
 
 class ChatMessage(BaseModel):
     role: str
@@ -15,6 +19,7 @@ class QueryRequest(BaseModel):
     question: str
     selected_models: List[str]
     history: Optional[List[ChatMessage]] = []
+    ocr_text: Optional[str] = None
 
 class ProviderModel(BaseModel):
     name: str = Field(..., min_length=1)
@@ -28,8 +33,8 @@ router = APIRouter()
 async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str, None]:
     try:
         orch = Orchestrator()
-        history_dicts = [msg.dict() for msg in request.history]
-        async for event in orch.process_query_stream(request.question, request.selected_models, history_dicts):
+        history_dicts = [msg.model_dump() for msg in request.history] if request.history else []
+        async for event in orch.process_query_stream(request.question, request.selected_models, history_dicts, request.ocr_text):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.01)
     except Exception as e:
@@ -53,7 +58,7 @@ def add_new_provider(data: ProviderModel):
         raise HTTPException(422, "OpenAI类型需提供api_base")
     if db.get_provider_by_name(data.name):
         raise HTTPException(409, f"服务商 '{data.name}' 已存在")
-    db.add_provider(data.dict())
+    db.add_provider(data.model_dump())
     return {"message": "添加成功"}
 
 @router.delete("/providers/{name}")
@@ -69,7 +74,7 @@ def update_provider_by_name(name: str, data: ProviderModel):
     if data.type == 'OpenAI' and not data.api_base:
         raise HTTPException(422, "OpenAI类型需提供api_base")
     
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
     if 'api_key' in update_data and (not update_data['api_key'] or '...' in update_data['api_key'] or update_data['api_key'] == '********'):
         del update_data['api_key']
     
@@ -92,12 +97,12 @@ def get_prompts():
 def add_new_prompt(data: PromptModel):
     if any(p['name'] == data.name for p in db.get_all_prompts()):
         raise HTTPException(409, f"提示词 '{data.name}' 已存在")
-    db.add_prompt(data.dict())
+    db.add_prompt(data.model_dump())
     return {"message": "添加成功"}
 
 @router.put("/prompts/{prompt_id}")
 def update_prompt_by_id(prompt_id: int, data: PromptModel):
-    if not db.update_prompt(prompt_id, data.dict()):
+    if not db.update_prompt(prompt_id, data.model_dump()):
         raise HTTPException(404, "更新失败")
     return {"message": "更新成功"}
 
@@ -115,5 +120,75 @@ def remove_prompt(prompt_id: int):
     if not db.delete_prompt(prompt_id):
         raise HTTPException(404, "删除失败")
     return {"message": "删除成功"}
+
+
+# OCR 接口：上传图片，指定OCR模型，返回识别出的文本
+@router.post("/ocr")
+async def ocr_image(
+    file: UploadFile = File(...),
+    ocr_model: str = Form(...)
+):
+    # 解析模型标识: provider::model
+    try:
+        provider_name, model_name = ocr_model.split("::", 1)
+    except ValueError:
+        raise HTTPException(400, "ocr_model 格式应为 '服务商名::模型名'")
+
+    provider_config = db.get_provider_by_name(provider_name)
+    if not provider_config:
+        raise HTTPException(404, f"未找到服务商: {provider_name}")
+
+    # 读取图片字节与 MIME 类型
+    image_bytes = await file.read()
+    mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+
+    if not image_bytes:
+        raise HTTPException(400, "未读取到图片内容")
+
+    provider_type = provider_config.get('type')
+
+    try:
+        if provider_type == 'OpenAI':
+            # 使用 OpenAI Chat Completions 的 vision 能力
+            client = openai.AsyncOpenAI(
+                api_key=provider_config['api_key'],
+                base_url=provider_config.get('api_base')
+            )
+            b64 = base64.b64encode(image_bytes).decode('utf-8')
+            image_url = f"data:{mime_type};base64,{b64}"
+            prompt_text = "请识别图片中的文字内容，尽量保持原有段落与换行。只输出识别到的文本。"
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_text},
+                            {"type": "image_url", "image_url": {"url": image_url}}
+                        ]
+                    }
+                ],
+                temperature=0
+            )
+            text = response.choices[0].message.content or ""
+        elif provider_type == 'Gemini':
+            # 使用 Gemini 多模态能力进行OCR
+            genai.configure(api_key=provider_config['api_key'])
+            model = genai.GenerativeModel(model_name)
+            prompt_text = "请识别图片中的文字内容，尽量保持原有段落与换行。只输出识别到的文本。"
+            parts = [
+                prompt_text,
+                {"mime_type": mime_type, "data": image_bytes}
+            ]
+            resp = await asyncio.to_thread(model.generate_content, parts)
+            text = getattr(resp, 'text', '') or ''
+        else:
+            raise HTTPException(400, f"不支持的服务商类型: {provider_type}")
+
+        if not text:
+            text = ""
+        return JSONResponse({"ocr_text": text})
+    except Exception as e:
+        raise HTTPException(500, f"OCR 识别失败: {e}")
 
 
