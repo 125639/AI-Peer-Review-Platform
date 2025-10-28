@@ -5,49 +5,6 @@ openai
 google-generativeai
 python-dotenv
 packaging
-<<<<<<< HEAD
 python-multipart
 
-# 修改评分逻辑，避免错误模型影响整体评分
 
-def calculate_scores(model_results):
-    total_score = 0
-    total_weight = 0
-    failed_models = []
-
-    for model in model_results:
-        if model.get("error"):  # 如果模型调用失败
-            failed_models.append({
-                "model": model["name"],
-                "error": model["error"]
-            })
-            continue
-
-        # 累计成功模型的评分和权重
-        total_score += model["score"] * model["weight"]
-        total_weight += model["weight"]
-
-    # 计算加权平均分
-    final_score = total_score / total_weight if total_weight > 0 else 0
-
-    return final_score, failed_models
-
-# 示例输入
-model_results = [
-    {"name": "模型 A", "score": 12, "weight": 1},
-    {"name": "模型 B", "error": "500 错误"},
-    {"name": "模型 C", "score": 6, "weight": 1},
-]
-
-# 计算总分
-final_score, failed_models = calculate_scores(model_results)
-
-# 输出结果
-print(f"总分: {final_score}/12")
-if failed_models:
-    print("调用失败的模型:")
-    for failed in failed_models:
-        print(f"- {failed['model']}: {failed['error']}")
-
-=======
->>>>>>> 64ed8471af1e204752757942038abf080c100ae5
