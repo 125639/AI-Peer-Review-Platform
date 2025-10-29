@@ -1,12 +1,31 @@
 import asyncio
+import logging
 import re
 from typing import List, Dict, Any, AsyncGenerator, Optional
+
 from .models import create_model_instance
 import core.database as db
 
+# 配置日志记录器
+logger = logging.getLogger(__name__)
+
+# 常量定义
+MAX_SCORE_PER_FIELD = 3
+MAX_TOTAL_SCORE = 12
+MIN_COMMENT_LENGTH = 50
+MAX_PREVIEW_LENGTH = 800
+MIN_COMMENT_PREVIEW = 5
+MIN_COMMENT_AFTER_SCORE = 10
+MIN_COMMENT_FINAL = 15
+
 class Orchestrator:
-    async def process_query_stream(self, user_question: str, selected_models: List[str], 
-                                   history: List[Dict[str, str]], ocr_text: Optional[str] = None) -> AsyncGenerator[Dict[str, Any], None]:
+    async def process_query_stream(
+        self, 
+        user_question: str, 
+        selected_models: List[str], 
+        history: List[Dict[str, str]], 
+        ocr_text: Optional[str] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         yield {"type": "status", "data": "正在初始化模型..."}
         
         active_models = []
@@ -17,7 +36,8 @@ class Orchestrator:
             provider_name, model_name = parts
             provider_config = db.get_provider_by_name(provider_name)
             if provider_config:
-                if instance := create_model_instance(provider_config, model_name):
+                instance = create_model_instance(provider_config, model_name)
+                if instance:
                     active_models.append(instance)
         
         if not active_models:
@@ -65,8 +85,12 @@ class Orchestrator:
         
         critiques = {m.name: [] for m in active_models}
         critique_tasks = [
-            (critic.name, target.name, self._generate_critique(critic, target.name, user_question, initial_answers.get(target.name, "")))
-            for critic in active_models for target in active_models if critic.name != target.name
+            (critic.name, target.name, self._generate_critique(
+                critic, target.name, user_question, initial_answers.get(target.name, "")
+            ))
+            for critic in active_models 
+            for target in active_models 
+            if critic.name != target.name
         ]
         
         results = await asyncio.gather(*[task for _, _, task in critique_tasks], return_exceptions=True)
@@ -87,15 +111,25 @@ class Orchestrator:
         
         revised_answers = {}
         revision_tasks = [
-            (model.name, self._generate_revision(model, initial_answers.get(model.name, ""), critiques.get(model.name, [])))
-            for model in active_models if critiques.get(model.name)
+            (model.name, self._generate_revision(
+                model, initial_answers.get(model.name, ""), critiques.get(model.name, [])
+            ))
+            for model in active_models 
+            if critiques.get(model.name)
         ]
         
         if revision_tasks:
             results = await asyncio.gather(*[task for _, task in revision_tasks], return_exceptions=True)
             for (model_name, _), result in zip(revision_tasks, results):
-                revised_answers[model_name] = initial_answers.get(model_name, "") if isinstance(result, Exception) else result
-                yield {"type": "revision_complete", "model_name": model_name, "revised_answer": revised_answers[model_name]}
+                if isinstance(result, Exception):
+                    revised_answers[model_name] = initial_answers.get(model_name, "")
+                else:
+                    revised_answers[model_name] = result
+                yield {
+                    "type": "revision_complete", 
+                    "model_name": model_name, 
+                    "revised_answer": revised_answers[model_name]
+                }
         
         for model in active_models:
             if model.name not in revised_answers:
@@ -103,7 +137,10 @@ class Orchestrator:
         
         yield {"type": "status", "data": "最终决策..."}
         best_answer, details = self._make_final_decision(initial_answers, critiques, revised_answers)
-        yield {"type": "final_result", "data": {"best_answer": best_answer, "process_details": details}}
+        yield {
+            "type": "final_result", 
+            "data": {"best_answer": best_answer, "process_details": details}
+        }
     
     async def _generate_critique(self, critic_model, target_name: str, question: str, answer: str) -> tuple:
         active_prompt = db.get_active_prompt()
@@ -141,9 +178,9 @@ class Orchestrator:
 
         if parsed.get("missing_fields"):
             missing_display = "、".join(parsed["missing_fields"])
-            print(
-                f"⚠️ {critic_model.name} 在 {attempts} 次尝试后仍缺少字段: {missing_display}. "
-                "将使用当前解析结果继续流程。"
+            logger.warning(
+                "%s 在 %d 次尝试后仍缺少字段: %s. 将使用当前解析结果继续流程。",
+                critic_model.name, attempts, missing_display
             )
 
         return (critique_text, parsed)
@@ -175,7 +212,10 @@ class Orchestrator:
         ]
         
         results.sort(key=lambda x: x['total_score'], reverse=True)
-        best_answer = results[0].get('revised_answer', '') if results else "无结果"
+        if results:
+            best_answer = results[0].get('revised_answer', '')
+        else:
+            best_answer = "无结果"
         return best_answer, results
     
     def _build_critique_prompt(self, question: str, target: str, answer: str, prompt_template: Optional[Dict] = None) -> str:
@@ -281,14 +321,10 @@ class Orchestrator:
     def _parse_critique(self, text: str, critic_name: str) -> Dict:
         # 检查是否为模型返回的错误信息
         if text.strip().startswith("[Error:") or "Error code:" in text:
-            print(f"\n{'='*60}")
-            print(f"🔍 解析 {critic_name} 的评审输出")
-            print(f"{'='*60}")
-            preview = text if len(text) < 800 else text[:800] + "..."
-            print(f"原始文本 ({len(text)} 字符):\n{preview}")
-            print(f"{'='*60}\n")
-            print(f"⚠️ 检测到模型返回错误，该次评审将被忽略。")
-            print(f"{'='*60}\n")
+            logger.error(f"解析 {critic_name} 的评审输出时检测到模型返回错误")
+            preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
+            logger.debug(f"原始文本 ({len(text)} 字符): {preview}")
+            logger.warning("检测到模型返回错误，该次评审将被忽略。")
             return {
                 "critic_name": critic_name,
                 "error": True,
@@ -309,12 +345,9 @@ class Orchestrator:
             "raw_text": text
         }
 
-        print(f"\n{'='*60}")
-        print(f"🔍 解析 {critic_name} 的评审输出")
-        print(f"{'='*60}")
-        preview = text if len(text) < 800 else text[:800] + "..."
-        print(f"原始文本 ({len(text)} 字符):\n{preview}")
-        print(f"{'='*60}\n")
+        logger.debug("解析 %s 的评审输出", critic_name)
+        preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
+        logger.debug("原始文本 (%d 字符): %s", len(text), preview)
 
         field_patterns = [
             ("accuracy", [r"准确性\s*[:：]\s*(\d+)", r"准确性\s*(\d+)", r"accuracy\s*[:：]?\s*(\d+)"]),
@@ -326,42 +359,45 @@ class Orchestrator:
         for field, patterns in field_patterns:
             found = False
             for pattern in patterns:
-                if match := re.search(pattern, text, re.I):
-                    data[field] = min(3, int(match.group(1)))
+                match = re.search(pattern, text, re.I)
+                if match:
+                    data[field] = min(MAX_SCORE_PER_FIELD, int(match.group(1)))
                     found = True
-                    print(f"✓ 找到{field}: {data[field]}")
+                    logger.debug("找到%s: %d", field, data[field])
                     break
             if not found:
                 data["missing_fields"].append(field)
-                print(f"✗ 未找到{field}评分")
+                logger.debug("未找到%s评分", field)
 
         total_patterns = [r"总分\s*[:：]\s*(\d+)", r"总分\s*(\d+)", r"total\s*[:：]?\s*(\d+)"]
         total_found = False
         for pattern in total_patterns:
-            if match := re.search(pattern, text, re.I):
-                data["score"] = min(12, int(match.group(1)))
+            match = re.search(pattern, text, re.I)
+            if match:
+                data["score"] = min(MAX_TOTAL_SCORE, int(match.group(1)))
                 total_found = True
-                print(f"✓ 找到总分: {data['score']}")
+                logger.debug("找到总分: %d", data['score'])
                 break
 
         if not total_found:
             data["score"] = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
-            if 0 < data["score"] <= 12:
-                print(
-                    f"✓ 计算总分: {data['score']} = {data['accuracy']}+{data['completeness']}+"
-                    f"{data['clarity']}+{data['usefulness']}"
+            if 0 < data["score"] <= MAX_TOTAL_SCORE:
+                logger.debug(
+                    "计算总分: %d = %d+%d+%d+%d",
+                    data['score'], data['accuracy'], data['completeness'], data['clarity'], data['usefulness']
                 )
             else:
                 data["missing_fields"].append("total")
-                print("✗ 无法确认总分")
+                logger.debug("无法确认总分")
         
         # 提取评语 - 多种模式尝试
         comment_found = False
         
         # 模式1: 标准的"评语:"格式
-        if comment := re.search(r"评语\s*[:：]\s*(.*?)(?:\n\n|\n(?:准确性|完整性|清晰性|实用性|总分)|$)", text, re.I | re.DOTALL):
+        comment = re.search(r"评语\s*[:：]\s*(.*?)(?:\n\n|\n(?:准确性|完整性|清晰性|实用性|总分)|$)", text, re.I | re.DOTALL)
+        if comment:
             comment_text = comment.group(1).strip()
-            if comment_text and len(comment_text) > 5:  # 确保有实质内容
+            if comment_text and len(comment_text) > MIN_COMMENT_PREVIEW:  # 确保有实质内容
                 data["comment"] = comment_text
                 comment_found = True
         
@@ -370,20 +406,22 @@ class Orchestrator:
             keywords = [r"建议[:：]?(.*?)(?:\n\n|$)", r"改进[:：]?(.*?)(?:\n\n|$)", 
                        r"缺陷[:：]?(.*?)(?:\n\n|$)", r"问题[:：]?(.*?)(?:\n\n|$)"]
             for pattern in keywords:
-                if match := re.search(pattern, text, re.I | re.DOTALL):
+                match = re.search(pattern, text, re.I | re.DOTALL)
+                if match:
                     comment_text = match.group(1).strip()
-                    if comment_text and len(comment_text) > 5:
+                    if comment_text and len(comment_text) > MIN_COMMENT_PREVIEW:
                         data["comment"] = comment_text
                         comment_found = True
                         break
         
         # 模式3: 如果前面都没有找到，尝试提取总分之后的内容
         if not comment_found:
-            if after_score := re.search(r"总分\s*[:：]\s*\d+\s*\n+(.*)", text, re.I | re.DOTALL):
+            after_score = re.search(r"总分\s*[:：]\s*\d+\s*\n+(.*)", text, re.I | re.DOTALL)
+            if after_score:
                 comment_text = after_score.group(1).strip()
                 # 移除可能的多余换行和空格
                 comment_text = re.sub(r'\n{3,}', '\n\n', comment_text)
-                if comment_text and len(comment_text) > 10:
+                if comment_text and len(comment_text) > MIN_COMMENT_AFTER_SCORE:
                     data["comment"] = comment_text
                     comment_found = True
         
@@ -393,14 +431,15 @@ class Orchestrator:
             last_score_pos = 0
             for pattern in [r"准确性\s*[:：]\s*\d+", r"完整性\s*[:：]\s*\d+", 
                            r"清晰性\s*[:：]\s*\d+", r"实用性\s*[:：]\s*\d+", r"总分\s*[:：]\s*\d+"]:
-                if match := re.search(pattern, text, re.I):
+                match = re.search(pattern, text, re.I)
+                if match:
                     last_score_pos = max(last_score_pos, match.end())
             
             if last_score_pos > 0:
                 remaining_text = text[last_score_pos:].strip()
                 # 移除"评语:"标签（如果有）
                 remaining_text = re.sub(r'^评语\s*[:：]\s*', '', remaining_text, flags=re.I)
-                if remaining_text and len(remaining_text) > 10:
+                if remaining_text and len(remaining_text) > MIN_COMMENT_AFTER_SCORE:
                     data["comment"] = remaining_text
                     comment_found = True
         
@@ -409,19 +448,18 @@ class Orchestrator:
             # 移除所有评分行
             cleaned_text = re.sub(r'(准确性|完整性|清晰性|实用性|总分)\s*[:：]\s*\d+\s*\n?', '', text, flags=re.I)
             cleaned_text = cleaned_text.strip()
-            if cleaned_text and len(cleaned_text) > 15:
+            if cleaned_text and len(cleaned_text) > MIN_COMMENT_FINAL:
                 data["comment"] = cleaned_text
             else:
                 data["comment"] = f"模型 {critic_name} 未按要求提供详细评语。"
                 data["missing_fields"].append("comment")
 
-        print(
-            f"\n最终评分: 准确{data['accuracy']} 完整{data['completeness']} "
-            f"清晰{data['clarity']} 实用{data['usefulness']} = {data['score']}/12"
+        logger.info(
+            "最终评分: 准确%d 完整%d 清晰%d 实用%d = %d/12",
+            data['accuracy'], data['completeness'], data['clarity'], data['usefulness'], data['score']
         )
         if data.get("missing_fields"):
-            print(f"⚠️ 缺少字段: {data['missing_fields']}")
-        print(f"{'='*60}\n")
+            logger.warning("缺少字段: %s", data['missing_fields'])
         
         return data
 

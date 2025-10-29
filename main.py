@@ -1,10 +1,12 @@
+import os
+
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
 from api.router import router as api_router
 import core.database as db
-import os
 
 app = FastAPI(title="AI Peer Review Platform")
 

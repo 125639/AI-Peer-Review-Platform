@@ -2,14 +2,214 @@
  * static/script.js
  * Version: 17.0.0 - 强制缓存更新 + 提示词管理功能
  * 更新时间: 2025-01-26 20:30:00
+ * Copyright (c) 2025 AI-Peer-Review-Platform. All rights reserved.
  */
 
-console.log('🚀 Script v17.0.0 loaded - Timestamp: 2025-01-26-20:30:00');
-console.log('✅ Prompt Management Feature Enabled');
-console.log('✅ Tab Switching Feature Enabled');
+// 初始化日志记录
+const log = {
+    info: (message) => {
+        if (window.DEBUG) {
+            // 使用自定义日志输出而不是 console
+            const logElement = document.getElementById('debug-log') || createDebugLogElement();
+            const timestamp = new Date().toISOString();
+            logElement.innerHTML += `<div class="log-entry info">[${timestamp}] [INFO] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+    },
+    error: (message) => {
+        // 错误日志总是显示
+        const logElement = document.getElementById('debug-log') || createDebugLogElement();
+        const timestamp = new Date().toISOString();
+        logElement.innerHTML += `<div class="log-entry error">[${timestamp}] [ERROR] ${message}</div>`;
+        logElement.scrollTop = logElement.scrollHeight;
+    },
+    warn: (message) => {
+        // 警告日志总是显示
+        const logElement = document.getElementById('debug-log') || createDebugLogElement();
+        const timestamp = new Date().toISOString();
+        logElement.innerHTML += `<div class="log-entry warn">[${timestamp}] [WARN] ${message}</div>`;
+        logElement.scrollTop = logElement.scrollHeight;
+    }
+};
+
+// 创建调试日志元素
+function createDebugLogElement() {
+    const logElement = document.createElement('div');
+    logElement.id = 'debug-log';
+    logElement.className = 'fixed bottom-4 left-4 w-96 h-48 bg-gray-900 text-white text-xs p-2 overflow-y-auto border border-gray-600 rounded z-50 hidden';
+    logElement.style.fontFamily = 'monospace';
+    document.body.appendChild(logElement);
+    return logElement;
+}
+
+// 通知系统
+const notification = {
+    show: (message, type = 'info', duration = 3000) => {
+        const notificationElement = document.createElement('div');
+        notificationElement.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full`;
+
+        const typeClasses = {
+            success: 'bg-green-600 text-white',
+            error: 'bg-red-600 text-white',
+            warning: 'bg-yellow-600 text-white',
+            info: 'bg-blue-600 text-white',
+        };
+
+        notificationElement.className += ` ${typeClasses[type] || typeClasses.info}`;
+        notificationElement.textContent = message;
+
+        document.body.appendChild(notificationElement);
+
+        // 动画显示
+        setTimeout(() => {
+            notificationElement.classList.remove('translate-x-full');
+        }, 100);
+
+        // 自动隐藏
+        setTimeout(() => {
+            notificationElement.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notificationElement.parentNode) {
+                    notificationElement.parentNode.removeChild(notificationElement);
+                }
+            }, 300);
+        }, duration);
+    },
+
+    success: (message) => notification.show(message, 'success'),
+    error: (message) => notification.show(message, 'error', 5000),
+    warning: (message) => notification.show(message, 'warning'),
+    info: (message) => notification.show(message, 'info'),
+};
+
+// 确认对话框系统
+const confirmDialog = {
+    show: (message, title = '确认') => {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+            
+            const dialog = document.createElement('div');
+            dialog.className = 'bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl';
+            
+            dialog.innerHTML = `
+                <h3 class="text-lg font-semibold text-white mb-4">${title}</h3>
+                <p class="text-gray-300 mb-6">${message}</p>
+                <div class="flex gap-3 justify-end">
+                    <button class="cancel-btn px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors">
+                        取消
+                    </button>
+                    <button class="confirm-btn px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+                        确认
+                    </button>
+                </div>
+            `;
+            
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            
+            const cancelBtn = dialog.querySelector('.cancel-btn');
+            const confirmBtn = dialog.querySelector('.confirm-btn');
+            
+            const cleanup = () => {
+                document.body.removeChild(overlay);
+            };
+            
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(false);
+            });
+            
+            confirmBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(true);
+            });
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    cleanup();
+                    resolve(false);
+                }
+            });
+        });
+    },
+};
+
+// 输入对话框系统
+const inputDialog = {
+    show: (message, defaultValue = '', title = '输入') => {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+            
+            const dialog = document.createElement('div');
+            dialog.className = 'bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl';
+            
+            dialog.innerHTML = `
+                <h3 class="text-lg font-semibold text-white mb-4">${title}</h3>
+                <p class="text-gray-300 mb-4">${message}</p>
+                <input type="text" class="input-field w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none" value="${defaultValue}">
+                <div class="flex gap-3 justify-end mt-6">
+                    <button class="cancel-btn px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors">
+                        取消
+                    </button>
+                    <button class="confirm-btn px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        确认
+                    </button>
+                </div>
+            `;
+            
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            
+            const inputField = dialog.querySelector('.input-field');
+            const cancelBtn = dialog.querySelector('.cancel-btn');
+            const confirmBtn = dialog.querySelector('.confirm-btn');
+            
+            // 自动聚焦并选中文本
+            inputField.focus();
+            inputField.select();
+            
+            const cleanup = () => {
+                document.body.removeChild(overlay);
+            };
+            
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+            
+            confirmBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(inputField.value);
+            });
+            
+            inputField.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    cleanup();
+                    resolve(inputField.value);
+                } else if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+        });
+    },
+};
+
+log.info('Script v17.0.0 loaded - Timestamp: 2025-01-26-20:30:00');
+log.info('Prompt Management Feature Enabled');
+log.info('Tab Switching Feature Enabled');
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing v16.0.0...');
+    log.info('DOM loaded, initializing v16.0.0...');
     
     const API_BASE_URL = window.location.origin;
     let conversationHistory = [];
@@ -49,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteImageBtn = document.getElementById('delete-image-btn');
     const uploadLabel = document.getElementById('upload-label');
     
-    console.log('Elements loaded:', { 
+    log.info('Elements loaded:', { 
         submitBtn: !!submitBtn,
         stopBtn: !!stopBtn,
         questionInput: !!questionInput,
@@ -60,32 +260,32 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 检查标签页按钮是否存在
     const tabButtons = document.querySelectorAll('.tab-btn');
-    console.log('Tab buttons found:', tabButtons.length);
+    log.info(`Tab buttons found: ${tabButtons.length}`);
     tabButtons.forEach((btn, index) => {
-        console.log(`Tab button ${index}:`, btn.dataset.tab, btn.textContent.trim());
+        log.info(`Tab button ${index}: ${btn.dataset.tab} - ${btn.textContent.trim()}`);
     });
     
     // === 标签页切换 ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        console.log('Adding click listener to tab:', btn.dataset.tab);
+        log.info(`Adding click listener to tab: ${btn.dataset.tab}`);
         btn.addEventListener('click', () => {
             const tabName = btn.dataset.tab;
-            console.log('Tab clicked:', tabName);
+            log.info(`Tab clicked: ${tabName}`);
             
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             
             document.querySelectorAll('.tab-content').forEach(content => {
-                console.log('Removing active from:', content.id);
+                log.info(`Removing active from: ${content.id}`);
                 content.classList.remove('active');
             });
         
             const targetTab = document.getElementById(`${tabName}-tab`);
             if (targetTab) {
                 targetTab.classList.add('active');
-                console.log('Tab activated:', tabName, 'Display:', window.getComputedStyle(targetTab).display);
+                log.info(`Tab activated: ${tabName}, Display: ${window.getComputedStyle(targetTab).display}`);
             } else {
-                console.error('Tab not found:', `${tabName}-tab`);
+                log.error(`Tab not found: ${tabName}-tab`);
             }
         });
     });
@@ -94,14 +294,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function markdownToHtml(text) {
         if (!text) return '';
         return String(text)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*(.*?)\*/g, "<em>$1</em>")
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-900 p-2 rounded-md my-2 text-sm overflow-x-auto"><code>$1</code></pre>')
             .replace(/`(.*?)`/g, '<code class="bg-gray-900 px-1 rounded-sm">$1</code>')
-            .replace(/\n/g, "<br>");
+            .replace(/\n/g, '<br>');
     }
 
     function escapeHtml(text) {
@@ -129,14 +329,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 停止生成 ===
     function stopGeneration() {
-        console.log('Stop button clicked');
+        log.info('Stop button clicked');
         
         if (currentReader) {
             try {
                 currentReader.cancel('User requested stop');
-                console.log('Stream cancelled');
+                log.info('Stream cancelled');
             } catch (e) {
-                console.error('Cancel error:', e);
+                log.error(`Cancel error: ${e}`);
             }
             currentReader = null;
         }
@@ -158,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const prompts = await response.json();
             renderPromptList(prompts);
         } catch (error) {
-            console.error('Failed to load prompts:', error);
+            log.error(`Failed to load prompts: ${error}`);
         }
     }
     
@@ -200,11 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 await loadPrompts();
-                alert('提示词已激活！');
+                notification.success('提示词已激活！');
             }
         } catch (error) {
-            console.error('Failed to activate prompt:', error);
-            alert('激活失败');
+            log.error(`Failed to activate prompt: ${error}`);
+            notification.error('激活失败');
         }
     };
     
@@ -213,13 +413,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = prompts.find(p => p.id === promptId);
         if (!prompt) return;
         
-        const name = window.prompt('提示词名称:', prompt.name);
+        const name = await inputDialog.show('提示词名称:', prompt.name, '编辑提示词');
         if (!name) return;
         
-        const critiquePrompt = window.prompt('评审提示词 (使用{question}、{target}、{answer}作为占位符):', prompt.critique_prompt);
+        const critiquePrompt = await inputDialog.show('评审提示词 (使用{question}、{target}、{answer}作为占位符):', prompt.critique_prompt, '编辑评审提示词');
         if (!critiquePrompt) return;
         
-        const revisionPrompt = window.prompt('修订提示词 (使用{original}、{feedback}作为占位符):', prompt.revision_prompt);
+        const revisionPrompt = await inputDialog.show('修订提示词 (使用{original}、{feedback}作为占位符):', prompt.revision_prompt, '编辑修订提示词');
         if (!revisionPrompt) return;
         
         try {
@@ -234,16 +434,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 await loadPrompts();
-                alert('更新成功！');
+                notification.success('更新成功！');
             }
         } catch (error) {
-            console.error('Failed to update prompt:', error);
-            alert('更新失败');
+            log.error(`Failed to update prompt: ${error}`);
+            notification.error('更新失败');
         }
     };
     
     window.deletePrompt = async function(promptId) {
-        if (!confirm('确定要删除这个提示词吗？')) return;
+        const confirmed = await confirmDialog.show('确定要删除这个提示词吗？', '删除提示词');
+        if (!confirmed) return;
         
         try {
             const response = await fetch(`${API_BASE_URL}/api/prompts/${promptId}`, {
@@ -251,14 +452,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 await loadPrompts();
-                alert('删除成功！');
+                notification.success('删除成功！');
             } else {
                 const error = await response.json();
-                alert(error.detail || '删除失败');
+                notification.error(error.detail || '删除失败');
             }
         } catch (error) {
-            console.error('Failed to delete prompt:', error);
-            alert('删除失败');
+            log.error(`Failed to delete prompt: ${error}`);
+            notification.error('删除失败');
         }
     };
     
@@ -279,153 +480,176 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             if (response.ok) {
-                alert('提示词添加成功！');
+                notification.success('提示词添加成功！');
                 addPromptForm.reset();
                 await loadPrompts();
             } else {
                 const error = await response.json();
-                alert(error.detail || '添加失败');
+                notification.error(error.detail || '添加失败');
             }
         } catch (error) {
-            console.error('Failed to add prompt:', error);
-            alert('添加失败，请检查网络连接');
+            log.error(`Failed to add prompt: ${error}`);
+            notification.error('添加失败，请检查网络连接');
         }
     });
     
     // === 渲染服务商列表（可展开编辑） ===
     function renderProviderList(providers) {
-        console.log('Rendering provider list, count:', providers.length);
-        providerListDiv.innerHTML = "";
+        log.info(`Rendering provider list, count: ${providers.length}`);
+        providerListDiv.innerHTML = '';
         
         if (providers.length === 0) {
             providerListDiv.innerHTML = '<p class="text-xs text-gray-500 p-2">尚未添加任何服务商</p>';
             return;
         }
         
-        providers.forEach((p, index) => {
-            console.log(`Creating provider card ${index + 1}:`, p.name);
-            
-            const wrapper = document.createElement('div');
-            wrapper.className = 'provider-item bg-gray-700/50 rounded-lg mb-2';
-            
-            // 头部（可点击展开）
-            const header = document.createElement('div');
-            header.className = 'flex justify-between items-center p-2 cursor-pointer hover:bg-gray-600/50 transition-colors rounded-t-lg';
-            header.innerHTML = `
-                <div>
-                    <span class="font-semibold text-sm text-cyan-400">${escapeHtml(p.name)}</span>
-                    <span class="text-xs text-gray-400 ml-2">(${p.type})</span>
-                </div>
-                <span class="text-gray-500 text-xs transition-transform arrow-icon">编辑 ▼</span>
-            `;
-            
-            // 编辑表单（默认隐藏）
-            const form = document.createElement('form');
-            form.className = 'edit-form hidden p-3 border-t border-gray-600 space-y-2';
-            form.innerHTML = `
-                <input name="name" value="${escapeHtml(p.name)}" class="form-input text-sm bg-gray-600 cursor-not-allowed" readonly title="名称不可修改">
-                <select name="type" class="form-input text-sm">
-                    <option value="OpenAI" ${p.type === 'OpenAI' ? 'selected' : ''}>OpenAI 兼容型</option>
-                    <option value="Gemini" ${p.type === 'Gemini' ? 'selected' : ''}>Google Gemini</option>
-                </select>
-                <input name="api_key" type="password" value="" class="form-input text-sm" placeholder="保持不变或输入新密钥">
-                <input name="api_base" value="${escapeHtml(p.api_base || '')}" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)">
-                <input name="models" required value="${escapeHtml(p.original_models)}" class="form-input text-sm" placeholder="模型列表 (逗号分隔)">
-                <div class="flex space-x-2 pt-1">
-                    <button type="submit" class="font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 flex-1 transition-colors">保存</button>
-                    <button type="button" class="delete-btn font-bold py-1 px-3 text-sm rounded-md bg-red-700 hover:bg-red-600">删除</button>
-                </div>
-            `;
-            
-            wrapper.appendChild(header);
-            wrapper.appendChild(form);
-            
-            // 直接绑定事件
-            header.addEventListener('click', function() {
-                const arrow = this.querySelector('.arrow-icon');
-                const isHidden = form.classList.contains('hidden');
-                
-                if (isHidden) {
-                    form.classList.remove('hidden');
-                    arrow.style.transform = 'rotate(180deg)';
-                } else {
-                    form.classList.add('hidden');
-                    arrow.style.transform = 'rotate(0deg)';
-                }
-            });
-            
-            const deleteBtn = form.querySelector('.delete-btn');
-            deleteBtn.addEventListener('click', async function() {
-                if (!confirm(`确定要删除服务商 '${p.name}' 吗？`)) return;
-                
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(p.name)}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || '删除失败');
-                    }
-                    
-                    await loadAndRenderAll();
-                } catch (error) {
-                    console.error('Delete error:', error);
-                    alert(`错误: ${error.message}`);
-                }
-            });
-            
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const submitButton = this.querySelector('button[type="submit"]');
-                const originalText = submitButton.textContent;
-                submitButton.textContent = '处理中...';
-                submitButton.disabled = true;
-                
-                try {
-                    const formData = new FormData(this);
-                    const data = {
-                        name: formData.get('name'),
-                        type: formData.get('type'),
-                        api_base: formData.get('api_base') || '',
-                        models: formData.get('models')
-                    };
-                    
-                    const apiKey = formData.get('api_key');
-                    if (apiKey && apiKey.trim() !== '') {
-                        data.api_key = apiKey.trim();
-                    }
-                    
-                    const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(p.name)}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || '修改失败');
-                    }
-                    
-                    await loadAndRenderAll();
-                } catch (error) {
-                    console.error('Update error:', error);
-                    alert(`错误: ${error.message}`);
-                } finally {
-                    submitButton.textContent = originalText;
-                    submitButton.disabled = false;
-                }
-            });
-            
+        providers.forEach((provider, index) => {
+            log.info(`Creating provider card ${index + 1}: ${provider.name}`);
+            const wrapper = createProviderCard(provider);
             providerListDiv.appendChild(wrapper);
         });
+    }
+
+    function createProviderCard(provider) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'provider-item bg-gray-700/50 rounded-lg mb-2';
+        
+        const header = createProviderHeader(provider);
+        const form = createProviderForm(provider);
+        
+        wrapper.appendChild(header);
+        wrapper.appendChild(form);
+        
+        setupProviderEventListeners(header, form, provider);
+        
+        return wrapper;
+    }
+
+    function createProviderHeader(provider) {
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-center p-2 cursor-pointer hover:bg-gray-600/50 transition-colors rounded-t-lg';
+        header.innerHTML = `
+            <div>
+                <span class="font-semibold text-sm text-cyan-400">${escapeHtml(provider.name)}</span>
+                <span class="text-xs text-gray-400 ml-2">(${provider.type})</span>
+            </div>
+            <span class="text-gray-500 text-xs transition-transform arrow-icon">编辑 ▼</span>
+        `;
+        return header;
+    }
+
+    function createProviderForm(provider) {
+        const form = document.createElement('form');
+        form.className = 'edit-form hidden p-3 border-t border-gray-600 space-y-2';
+        form.innerHTML = `
+            <input name="name" value="${escapeHtml(provider.name)}" class="form-input text-sm bg-gray-600 cursor-not-allowed" readonly title="名称不可修改">
+            <select name="type" class="form-input text-sm">
+                <option value="OpenAI" ${provider.type === 'OpenAI' ? 'selected' : ''}>OpenAI 兼容型</option>
+                <option value="Gemini" ${provider.type === 'Gemini' ? 'selected' : ''}>Google Gemini</option>
+            </select>
+            <input name="api_key" type="password" value="" class="form-input text-sm" placeholder="保持不变或输入新密钥">
+            <input name="api_base" value="${escapeHtml(provider.api_base || '')}" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)">
+            <input name="models" required value="${escapeHtml(provider.original_models)}" class="form-input text-sm" placeholder="模型列表 (逗号分隔)">
+            <div class="flex space-x-2 pt-1">
+                <button type="submit" class="font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 flex-1 transition-colors">保存</button>
+                <button type="button" class="delete-btn font-bold py-1 px-3 text-sm rounded-md bg-red-700 hover:bg-red-600">删除</button>
+            </div>
+        `;
+        return form;
+    }
+
+    function setupProviderEventListeners(header, form, provider) {
+        // 头部点击事件
+        header.addEventListener('click', function() {
+            const arrow = this.querySelector('.arrow-icon');
+            const isHidden = form.classList.contains('hidden');
+            
+            if (isHidden) {
+                form.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                form.classList.add('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        });
+        
+        // 删除按钮事件
+        const deleteBtn = form.querySelector('.delete-btn');
+        deleteBtn.addEventListener('click', () => handleProviderDelete(provider));
+        
+        // 表单提交事件
+        form.addEventListener('submit', (e) => handleProviderUpdate(e, provider));
+    }
+
+    async function handleProviderDelete(provider) {
+        const confirmed = await confirmDialog.show(`确定要删除服务商 '${provider.name}' 吗？`, '删除服务商');
+        if (!confirmed) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(provider.name)}`, {
+                method: 'DELETE',
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || '删除失败');
+            }
+            
+            await loadAndRenderAll();
+        } catch (error) {
+            log.error(`Delete error: ${error}`);
+            notification.error(`错误: ${error.message}`);
+        }
+    }
+
+    async function handleProviderUpdate(e, provider) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalText = submitButton.textContent;
+        submitButton.textContent = '处理中...';
+        submitButton.disabled = true;
+        
+        try {
+            const formData = new FormData(form);
+            const data = {
+                name: formData.get('name'),
+                type: formData.get('type'),
+                api_base: formData.get('api_base') || '',
+                models: formData.get('models'),
+            };
+            
+            const apiKey = formData.get('api_key');
+            if (apiKey && apiKey.trim() !== '') {
+                data.api_key = apiKey.trim();
+            }
+            
+            const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(provider.name)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || '修改失败');
+            }
+            
+            await loadAndRenderAll();
+        } catch (error) {
+            log.error(`Update error: ${error}`);
+            notification.error(`错误: ${error.message}`);
+        } finally {
+            submitButton.textContent = originalText;
+            submitButton.disabled = false;
+        }
     }
     
     // === 渲染模型选择列表 ===
     function renderModelSelection(providers) {
-        modelListContainer.innerHTML = "";
+        modelListContainer.innerHTML = '';
         
         if (providers.length === 0) {
             modelListContainer.innerHTML = '<p class="text-xs text-gray-500 p-2">无可用模型</p>';
@@ -498,8 +722,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 addProviderForm.reset();
                 await loadAndRenderAll();
             } catch (error) {
-                console.error('Add provider error:', error);
-                alert(`错误: ${error.message}`);
+                log.error(`Add provider error: ${error}`);
+                notification.error(`错误: ${error.message}`);
             } finally {
                 submitButton.textContent = originalText;
                 submitButton.disabled = false;
@@ -520,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderModelSelection(providers);
             renderOcrModelOptions(providers);
         } catch (error) {
-            console.error('Load error:', error);
+            log.error(`Load error: ${error}`);
             const errorMsg = `<p class="text-red-500 p-2">加载失败: ${error.message}</p>`;
             providerListDiv.innerHTML = errorMsg;
             modelListContainer.innerHTML = errorMsg;
@@ -533,39 +757,62 @@ document.addEventListener('DOMContentLoaded', () => {
     // === 提交问题 ===
     async function handleSubmission() {
         if (isGenerating) {
-            console.log('Already generating, ignoring submit');
+            log.info('Already generating, ignoring submit');
             return;
         }
         
         const question = questionInput.value.trim();
         if (!question) return;
         
-        const selectedModels = Array.from(document.querySelectorAll('.model-checkbox:checked'))
-            .map(cb => cb.value);
-        
+        const selectedModels = getSelectedModels();
         if (selectedModels.length === 0) {
-            alert('请至少选择一个模型！');
+            notification.warning('请至少选择一个模型！');
             return;
         }
         
-        // 添加用户消息
+        const userBubble = createUserBubble(question);
+        const assistantBubble = createAssistantBubble();
+        
+        setupSubmission(question);
+        
+        try {
+            await processQuery(question, selectedModels, assistantBubble, userBubble);
+        } catch (error) {
+            handleSubmissionError(error, assistantBubble);
+        } finally {
+            cleanupSubmission();
+        }
+    }
+    
+    function getSelectedModels() {
+        return Array.from(document.querySelectorAll('.model-checkbox:checked'))
+            .map(cb => cb.value);
+    }
+    
+    function createUserBubble(question) {
         const userBubble = document.createElement('div');
         userBubble.className = 'chat-bubble user-bubble mt-8';
         userBubble.textContent = question;
         chatLog.appendChild(userBubble);
-        
-        conversationHistory.push({ role: 'user', content: question });
-        questionInput.value = '';
-        toggleLoading(true);
-        
-        // 添加临时助手气泡
+        return userBubble;
+    }
+    
+    function createAssistantBubble() {
         const assistantBubble = document.createElement('div');
         assistantBubble.className = 'chat-bubble assistant-bubble mt-4';
         assistantBubble.innerHTML = '<span class="italic text-gray-400">正在连接服务器...</span>';
         chatLog.appendChild(assistantBubble);
         chatLog.scrollTop = chatLog.scrollHeight;
-        
-        try {
+        return assistantBubble;
+    }
+    
+    function setupSubmission(question) {
+        conversationHistory.push({ role: 'user', content: question });
+        questionInput.value = '';
+        toggleLoading(true);
+    }
+    
+    async function processQuery(question, selectedModels, assistantBubble, userBubble) {
             const response = await fetch(`${API_BASE_URL}/api/process`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -579,6 +826,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
+        await processStream(response, assistantBubble, userBubble, question);
+    }
+    
+    async function processStream(response, assistantBubble, userBubble, question) {
             currentReader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -590,13 +841,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     const { value, done } = await currentReader.read();
                     
                     if (done) {
-                        console.log('Stream complete');
+                    log.info('Stream complete');
                         break;
                     }
                     
+                const result = processStreamChunk(value, decoder, buffer, assistantBubble);
+                buffer = result.buffer;
+                if (result.finalAnswer) finalAnswer = result.finalAnswer;
+                if (result.finalDetails) finalDetails = result.finalDetails;
+                
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
+        } catch (error) {
+            if (error.name === 'AbortError' || error.message.includes('cancel')) {
+                log.info('Stream was cancelled');
+                return;
+            }
+            throw error;
+        }
+        
+        if (isGenerating && finalAnswer) {
+            displayFinalResult(assistantBubble, finalAnswer, finalDetails, userBubble, question);
+        }
+    }
+    
+    function processStreamChunk(value, decoder, buffer, assistantBubble) {
                     buffer += decoder.decode(value, { stream: true });
                     const parts = buffer.split('\n\n');
-                    buffer = parts.pop() || '';
+        const newBuffer = parts.pop() || '';
+        let finalAnswer = '';
+        let finalDetails = [];
                     
                     for (const part of parts) {
                         if (!part.startsWith('data: ')) continue;
@@ -611,27 +885,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                 finalDetails = event.data.process_details || [];
                             }
                         } catch (e) {
-                            console.error('Parse error:', e);
-                        }
-                    }
-                    
-                    chatLog.scrollTop = chatLog.scrollHeight;
-                }
-            } catch (error) {
-                if (error.name === 'AbortError' || error.message.includes('cancel')) {
-                    console.log('Stream was cancelled');
-                    return;
-                }
-                throw error;
+                log.error(`Parse error: ${e}`);
             }
-            
-            // 只有在没被停止的情况下才显示最终结果
-            if (isGenerating) {
+        }
+        
+        return { buffer: newBuffer, finalAnswer, finalDetails };
+    }
+    
+    function displayFinalResult(assistantBubble, finalAnswer, finalDetails, userBubble, question) {
                 assistantBubble.innerHTML = markdownToHtml(finalAnswer);
                 conversationHistory.push({ role: 'assistant', content: finalAnswer });
                 
-                // 添加操作按钮
                 if (finalDetails.length > 0) {
+            createActionButtons(finalDetails, assistantBubble, userBubble, question);
+        }
+    }
+    
+    function createActionButtons(finalDetails, assistantBubble, userBubble, question) {
                     const actionsDiv = document.createElement('div');
                     actionsDiv.className = 'action-buttons';
                     actionsDiv.innerHTML = `
@@ -654,28 +924,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         questionInput.value = question;
                         handleSubmission();
                     });
-                }
             }
             
-        } catch (error) {
-            console.error('Submission error:', error);
+    function handleSubmissionError(error, assistantBubble) {
+        log.error(`Submission error: ${error}`);
             if (isGenerating) {
                 assistantBubble.innerHTML = `<span class="text-red-400">错误: ${error.message}</span>`;
             }
-        } finally {
+    }
+    
+    function cleanupSubmission() {
             currentReader = null;
             toggleLoading(false);
             chatLog.scrollTop = chatLog.scrollHeight;
-            // 一次提交后清空待发送的 OCR 文本和图片
             pendingOcrText = null;
             clearImageSelection();
-        }
     }
 
     // === 图片处理函数 ===
     function handleImageFile(file) {
         if (!file || !file.type.startsWith('image/')) {
-            alert('请选择一个图片文件。');
+            notification.warning('请选择一个图片文件。');
             return;
         }
         selectedImageFile = file;
@@ -688,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsDataURL(file);
         
-        console.log('选中图片:', file.name, file.type, file.size);
+        log.info(`选中图片: ${file.name}, ${file.type}, ${file.size}`);
     }
 
     function clearImageSelection() {
@@ -697,7 +966,7 @@ document.addEventListener('DOMContentLoaded', () => {
         imagePreview.src = '';
         imagePreviewContainer.classList.add('hidden');
         uploadLabel.classList.remove('hidden'); // 恢复上传按钮
-        console.log('图片已清除');
+        log.info('图片已清除');
     }
 
     // === OCR 处理逻辑 ===
@@ -733,12 +1002,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function uploadAndRecognizeImage() {
         if (!selectedImageFile) {
-            alert('请先选择一张图片');
+            notification.warning('请先选择一张图片');
             return;
         }
         const ocrModel = ocrModelSelect ? ocrModelSelect.value : '';
         if (!ocrModel) {
-            alert('请选择一个OCR模型');
+            notification.warning('请选择一个OCR模型');
             return;
         }
         try {
@@ -755,13 +1024,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await resp.json();
             pendingOcrText = (data && data.ocr_text) ? String(data.ocr_text) : '';
             if (pendingOcrText) {
-                alert('图片识别完成，结果已加入上下文');
+                notification.success('图片识别完成，结果已加入上下文');
             } else {
-                alert('未识别到文字或结果为空');
+                notification.warning('未识别到文字或结果为空');
             }
         } catch (e) {
-            console.error('OCR error:', e);
-            alert(`OCR 失败: ${e.message}`);
+            log.error(`OCR error: ${e}`);
+            notification.error(`OCR 失败: ${e.message}`);
         } finally {
             if (ocrBtn) {
                 ocrBtn.disabled = false;
@@ -779,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === 渲染详情 ===
     function renderProcessDetails(details) {
-        processDetailsContainer.innerHTML = "";
+        processDetailsContainer.innerHTML = '';
         
         if (!details || details.length === 0) {
             processDetailsContainer.innerHTML = '<p class="text-gray-500">没有详细过程信息。</p>';
@@ -861,11 +1130,12 @@ document.addEventListener('DOMContentLoaded', () => {
         questionInput.style.height = `${questionInput.scrollHeight}px`;
     });
     
-    newChatBtn.addEventListener('click', () => {
-        if (confirm('确定要开始新对话吗？当前对话记录将被清除。')) {
+    newChatBtn.addEventListener('click', async () => {
+        const confirmed = await confirmDialog.show('确定要开始新对话吗？当前对话记录将被清除。', '新对话');
+        if (confirmed) {
             conversationHistory = [];
             chatLog.innerHTML = '';
-            console.log('New chat started');
+            log.info('New chat started');
         }
     });
     
@@ -890,11 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 显示当前主题文字（暗色/亮色）
     if (themeText) themeText.textContent = isDark ? '暗色' : '亮色';
         // 诊断日志（可帮助排查主题未变化的问题）
-        console.debug('[theme]', {
-            applied: theme,
-            htmlHasDark: document.documentElement.classList.contains('dark'),
-            bodyHasDark: document.body ? document.body.classList.contains('dark') : false
-        });
+        log.info(`[theme] applied: ${theme}, htmlHasDark: ${document.documentElement.classList.contains('dark')}, bodyHasDark: ${document.body ? document.body.classList.contains('dark') : false}`);
     }
 
     if (themeToggle) {
@@ -946,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(savedTheme);
     
     loadAndRenderAll();
-    console.log('Initialization complete v17.0.0');
+    log.info('Initialization complete v17.0.0');
 });
 
 

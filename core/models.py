@@ -1,8 +1,9 @@
 import abc
-import openai
-import google.generativeai as genai
-from typing import List, Dict, Optional, AsyncGenerator
 import asyncio
+from typing import List, Dict, Optional, AsyncGenerator
+
+import google.generativeai as genai
+import openai
 
 class BaseModel(abc.ABC):
     def __init__(self, provider_config: Dict, model_name: str):
@@ -48,7 +49,8 @@ class OpenAIModel(BaseModel):
                 stream=True
             )
             async for chunk in stream:
-                if content := chunk.choices[0].delta.content:
+                content = chunk.choices[0].delta.content
+                if content:
                     yield content
         except Exception as e:
             yield f"[Error: {e}]"
