@@ -179,8 +179,13 @@ class Orchestrator:
         if parsed.get("missing_fields"):
             missing_display = "、".join(parsed["missing_fields"])
             logger.warning(
+<<<<<<< HEAD
                 "%s 在 %d 次尝试后仍缺少字段: %s. 将使用当前解析结果继续流程。",
                 critic_model.name, attempts, missing_display
+=======
+                f"{critic_model.name} 在 {attempts} 次尝试后仍缺少字段: {missing_display}. "
+                "将使用当前解析结果继续流程。"
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
             )
 
         return (critique_text, parsed)
@@ -345,9 +350,15 @@ class Orchestrator:
             "raw_text": text
         }
 
+<<<<<<< HEAD
         logger.debug("解析 %s 的评审输出", critic_name)
         preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
         logger.debug("原始文本 (%d 字符): %s", len(text), preview)
+=======
+        logger.debug(f"解析 {critic_name} 的评审输出")
+        preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
+        logger.debug(f"原始文本 ({len(text)} 字符): {preview}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 
         field_patterns = [
             ("accuracy", [r"准确性\s*[:：]\s*(\d+)", r"准确性\s*(\d+)", r"accuracy\s*[:：]?\s*(\d+)"]),
@@ -363,11 +374,19 @@ class Orchestrator:
                 if match:
                     data[field] = min(MAX_SCORE_PER_FIELD, int(match.group(1)))
                     found = True
+<<<<<<< HEAD
                     logger.debug("找到%s: %d", field, data[field])
                     break
             if not found:
                 data["missing_fields"].append(field)
                 logger.debug("未找到%s评分", field)
+=======
+                    logger.debug(f"找到{field}: {data[field]}")
+                    break
+            if not found:
+                data["missing_fields"].append(field)
+                logger.debug(f"未找到{field}评分")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 
         total_patterns = [r"总分\s*[:：]\s*(\d+)", r"总分\s*(\d+)", r"total\s*[:：]?\s*(\d+)"]
         total_found = False
@@ -376,15 +395,24 @@ class Orchestrator:
             if match:
                 data["score"] = min(MAX_TOTAL_SCORE, int(match.group(1)))
                 total_found = True
+<<<<<<< HEAD
                 logger.debug("找到总分: %d", data['score'])
+=======
+                logger.debug(f"找到总分: {data['score']}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
                 break
 
         if not total_found:
             data["score"] = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
             if 0 < data["score"] <= MAX_TOTAL_SCORE:
                 logger.debug(
+<<<<<<< HEAD
                     "计算总分: %d = %d+%d+%d+%d",
                     data['score'], data['accuracy'], data['completeness'], data['clarity'], data['usefulness']
+=======
+                    f"计算总分: {data['score']} = {data['accuracy']}+{data['completeness']}+"
+                    f"{data['clarity']}+{data['usefulness']}"
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
                 )
             else:
                 data["missing_fields"].append("total")
@@ -455,11 +483,19 @@ class Orchestrator:
                 data["missing_fields"].append("comment")
 
         logger.info(
+<<<<<<< HEAD
             "最终评分: 准确%d 完整%d 清晰%d 实用%d = %d/12",
             data['accuracy'], data['completeness'], data['clarity'], data['usefulness'], data['score']
         )
         if data.get("missing_fields"):
             logger.warning("缺少字段: %s", data['missing_fields'])
+=======
+            f"最终评分: 准确{data['accuracy']} 完整{data['completeness']} "
+            f"清晰{data['clarity']} 实用{data['usefulness']} = {data['score']}/12"
+        )
+        if data.get("missing_fields"):
+            logger.warning(f"缺少字段: {data['missing_fields']}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
         
         return data
 

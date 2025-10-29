@@ -9,6 +9,7 @@
 const log = {
     info: (message) => {
         if (window.DEBUG) {
+<<<<<<< HEAD
             // 使用自定义日志输出而不是 console
             const logElement = document.getElementById('debug-log') || createDebugLogElement();
             const timestamp = new Date().toISOString();
@@ -47,11 +48,30 @@ const notification = {
     show: (message, type = 'info', duration = 3000) => {
         const notificationElement = document.createElement('div');
         notificationElement.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full`;
+=======
+            console.log(`[INFO] ${message}`);
+        }
+    },
+    error: (message) => {
+        console.error(`[ERROR] ${message}`);
+    },
+    warn: (message) => {
+        console.warn(`[WARN] ${message}`);
+    }
+};
+
+// 通知系统
+const notification = {
+    show: (message, type = 'info', duration = 3000) => {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full`;
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 
         const typeClasses = {
             success: 'bg-green-600 text-white',
             error: 'bg-red-600 text-white',
             warning: 'bg-yellow-600 text-white',
+<<<<<<< HEAD
             info: 'bg-blue-600 text-white',
         };
 
@@ -63,14 +83,34 @@ const notification = {
         // 动画显示
         setTimeout(() => {
             notificationElement.classList.remove('translate-x-full');
+=======
+            info: 'bg-blue-600 text-white'
+        };
+
+        notification.className += ` ${typeClasses[type] || typeClasses.info}`;
+        notification.textContent = message;
+
+        document.body.appendChild(notification);
+
+        // 动画显示
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
         }, 100);
 
         // 自动隐藏
         setTimeout(() => {
+<<<<<<< HEAD
             notificationElement.classList.add('translate-x-full');
             setTimeout(() => {
                 if (notificationElement.parentNode) {
                     notificationElement.parentNode.removeChild(notificationElement);
+=======
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
                 }
             }, 300);
         }, duration);
@@ -79,7 +119,11 @@ const notification = {
     success: (message) => notification.show(message, 'success'),
     error: (message) => notification.show(message, 'error', 5000),
     warning: (message) => notification.show(message, 'warning'),
+<<<<<<< HEAD
     info: (message) => notification.show(message, 'info'),
+=======
+    info: (message) => notification.show(message, 'info')
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 };
 
 // 确认对话框系统
@@ -132,7 +176,11 @@ const confirmDialog = {
                 }
             });
         });
+<<<<<<< HEAD
     },
+=======
+    }
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 };
 
 // 输入对话框系统
@@ -201,7 +249,11 @@ const inputDialog = {
                 }
             });
         });
+<<<<<<< HEAD
     },
+=======
+    }
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 };
 
 log.info('Script v17.0.0 loaded - Timestamp: 2025-01-26-20:30:00');
@@ -503,9 +555,130 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+<<<<<<< HEAD
         providers.forEach((provider, index) => {
             log.info(`Creating provider card ${index + 1}: ${provider.name}`);
             const wrapper = createProviderCard(provider);
+=======
+        providers.forEach((p, index) => {
+            log.info(`Creating provider card ${index + 1}: ${p.name}`);
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'provider-item bg-gray-700/50 rounded-lg mb-2';
+            
+            // 头部（可点击展开）
+            const header = document.createElement('div');
+            header.className = 'flex justify-between items-center p-2 cursor-pointer hover:bg-gray-600/50 transition-colors rounded-t-lg';
+            header.innerHTML = `
+                <div>
+                    <span class="font-semibold text-sm text-cyan-400">${escapeHtml(p.name)}</span>
+                    <span class="text-xs text-gray-400 ml-2">(${p.type})</span>
+                </div>
+                <span class="text-gray-500 text-xs transition-transform arrow-icon">编辑 ▼</span>
+            `;
+            
+            // 编辑表单（默认隐藏）
+            const form = document.createElement('form');
+            form.className = 'edit-form hidden p-3 border-t border-gray-600 space-y-2';
+            form.innerHTML = `
+                <input name="name" value="${escapeHtml(p.name)}" class="form-input text-sm bg-gray-600 cursor-not-allowed" readonly title="名称不可修改">
+                <select name="type" class="form-input text-sm">
+                    <option value="OpenAI" ${p.type === 'OpenAI' ? 'selected' : ''}>OpenAI 兼容型</option>
+                    <option value="Gemini" ${p.type === 'Gemini' ? 'selected' : ''}>Google Gemini</option>
+                </select>
+                <input name="api_key" type="password" value="" class="form-input text-sm" placeholder="保持不变或输入新密钥">
+                <input name="api_base" value="${escapeHtml(p.api_base || '')}" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)">
+                <input name="models" required value="${escapeHtml(p.original_models)}" class="form-input text-sm" placeholder="模型列表 (逗号分隔)">
+                <div class="flex space-x-2 pt-1">
+                    <button type="submit" class="font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 flex-1 transition-colors">保存</button>
+                    <button type="button" class="delete-btn font-bold py-1 px-3 text-sm rounded-md bg-red-700 hover:bg-red-600">删除</button>
+                </div>
+            `;
+            
+            wrapper.appendChild(header);
+            wrapper.appendChild(form);
+            
+            // 直接绑定事件
+            header.addEventListener('click', function() {
+                const arrow = this.querySelector('.arrow-icon');
+                const isHidden = form.classList.contains('hidden');
+                
+                if (isHidden) {
+                    form.classList.remove('hidden');
+                    arrow.style.transform = 'rotate(180deg)';
+                } else {
+                    form.classList.add('hidden');
+                    arrow.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            const deleteBtn = form.querySelector('.delete-btn');
+            deleteBtn.addEventListener('click', async function() {
+                const confirmed = await confirmDialog.show(`确定要删除服务商 '${p.name}' 吗？`, '删除服务商');
+                if (!confirmed) return;
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(p.name)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || '删除失败');
+                    }
+                    
+                    await loadAndRenderAll();
+                } catch (error) {
+                    log.error(`Delete error: ${error}`);
+                    notification.error(`错误: ${error.message}`);
+                }
+            });
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const submitButton = this.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = '处理中...';
+                submitButton.disabled = true;
+                
+                try {
+                    const formData = new FormData(this);
+                    const data = {
+                        name: formData.get('name'),
+                        type: formData.get('type'),
+                        api_base: formData.get('api_base') || '',
+                        models: formData.get('models')
+                    };
+                    
+                    const apiKey = formData.get('api_key');
+                    if (apiKey && apiKey.trim() !== '') {
+                        data.api_key = apiKey.trim();
+                    }
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/providers/${encodeURIComponent(p.name)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || '修改失败');
+                    }
+                    
+                    await loadAndRenderAll();
+                } catch (error) {
+                    log.error(`Update error: ${error}`);
+                    notification.error(`错误: ${error.message}`);
+                } finally {
+                    submitButton.textContent = originalText;
+                    submitButton.disabled = false;
+                }
+            });
+            
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
             providerListDiv.appendChild(wrapper);
         });
     }
