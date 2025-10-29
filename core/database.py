@@ -1,5 +1,5 @@
-import sqlite3
 import os
+import sqlite3
 from typing import List, Dict, Any, Optional
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'providers.db')
@@ -113,13 +113,17 @@ def add_provider(provider_data: Dict[str, Any]):
 def update_provider(original_name: str, provider_data: Dict[str, Any]) -> bool:
     with get_db_connection() as conn:
         if provider_data.get('api_key'):
-            result = conn.execute('UPDATE providers SET type = ?, api_key = ?, api_base = ?, models = ? WHERE name = ?',
-                                (provider_data['type'], provider_data['api_key'], 
-                                 provider_data.get('api_base', ''), provider_data['models'], original_name)).rowcount > 0
+            result = conn.execute(
+                'UPDATE providers SET type = ?, api_key = ?, api_base = ?, models = ? WHERE name = ?',
+                (provider_data['type'], provider_data['api_key'], 
+                 provider_data.get('api_base', ''), provider_data['models'], original_name)
+            ).rowcount > 0
         else:
-            result = conn.execute('UPDATE providers SET type = ?, api_base = ?, models = ? WHERE name = ?',
-                                (provider_data['type'], provider_data.get('api_base', ''), 
-                                 provider_data['models'], original_name)).rowcount > 0
+            result = conn.execute(
+                'UPDATE providers SET type = ?, api_base = ?, models = ? WHERE name = ?',
+                (provider_data['type'], provider_data.get('api_base', ''), 
+                 provider_data['models'], original_name)
+            ).rowcount > 0
         conn.commit()
         return result
 

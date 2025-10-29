@@ -10,25 +10,31 @@
         window.tailwind = window.tailwind || {};
         tailwind.config = { darkMode: 'class' };
         // 2) 尽早设置 html 的 dark 类，减少首屏闪烁
-        (function() {
+        (() => {
             try {
-                var theme = localStorage.getItem('theme') || 'dark';
+                const theme = localStorage.getItem('theme') || 'dark';
                 if (theme === 'dark') {
                     document.documentElement.classList.add('dark');
-                    document.addEventListener('DOMContentLoaded', function(){
-                        if (document.body) document.body.classList.add('dark');
+                    document.addEventListener('DOMContentLoaded', () => {
+                        if (document.body) {
+                            document.body.classList.add('dark');
+                        }
                     });
                 } else {
                     document.documentElement.classList.remove('dark');
-                    document.addEventListener('DOMContentLoaded', function(){
-                        if (document.body) document.body.classList.remove('dark');
+                    document.addEventListener('DOMContentLoaded', () => {
+                        if (document.body) {
+                            document.body.classList.remove('dark');
+                        }
                     });
                 }
             } catch (e) {
                 // 本地存储不可用时默认为暗色
                 document.documentElement.classList.add('dark');
-                document.addEventListener('DOMContentLoaded', function(){
-                    if (document.body) document.body.classList.add('dark');
+                document.addEventListener('DOMContentLoaded', () => {
+                    if (document.body) {
+                        document.body.classList.add('dark');
+                    }
                 });
             }
         })();
