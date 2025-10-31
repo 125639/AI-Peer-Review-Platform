@@ -1,0 +1,32 @@
+version: '3.8'
+
+# 开发环境配置 - 支持热重载
+services:
+  ai-app:
+    build:
+      context: ..
+      dockerfile: docker文件/Dockerfile
+    container_name: ai-chat-app-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # 挂载源代码以支持热重载
+      - ../:/app
+      # 排除Python缓存
+      - /app/__pycache__
+      - /app/api/__pycache__
+      - /app/core/__pycache__
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RELOAD=true
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+    networks:
+      - ai-network
+
+networks:
+  ai-network:
+    driver: bridge
+

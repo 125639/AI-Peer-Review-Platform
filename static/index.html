@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI工厂 v13.0</title>
+    <title>AI工厂 v14.0 - OCR增强版</title>
     <!-- 启用 Tailwind 暗色模式的 class 策略，并在最早阶段应用保存的主题，避免闪烁 -->
     <script>
         // 1) 告诉 Tailwind 使用 class 策略切换暗色
@@ -309,7 +309,7 @@
     <aside id="sidebar" class="w-1/3 max-w-md bg-white dark:bg-gray-800 p-4 overflow-y-auto h-full flex flex-col transition-all duration-300 relative">
         <header class="text-center mb-4 flex-shrink-0">
             <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-cyan-500">AI 工厂</h1>
-            <p class="text-xs text-gray-500 dark:text-gray-400">v14.0 - 自定义提示词系统</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">v14.0 - OCR增强版</p>
         </header>
         
         <!-- 标签页导航 -->
@@ -365,10 +365,11 @@
                     </div>
                 </div>
             </div>
-            <!-- 新 增的设置标签页 -->
+            <!-- 设置标签页 -->
             <div id="settings-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
                 <div class="space-y-6">
                     <h2 class="section-title text-xl font-bold text-black dark:text-gray-300" data-i18n="settings_title">界面设置</h2>
+                    
                     <!-- 语言设置 -->
                     <div id="lang-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
                         <h3 class="font-semibold mb-2" data-i18n="lang_title">语言设置</h3>
@@ -379,6 +380,19 @@
                             <input type="radio" name="ui-lang" value="en"> <span data-i18n="lang_en">English</span>
                         </label>
                     </div>
+                    
+                    <!-- OCR模型设置 -->
+                    <div id="ocr-model-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel" style="display: block !important;">
+                        <h3 class="font-semibold mb-2 text-cyan-600 dark:text-cyan-400" data-i18n="ocr_model_title">📷 图片文字识别模型</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" data-i18n="ocr_model_tip">选择用于识别图片文字的模型（仅显示支持图片的模型）</p>
+                        <select id="ocr-model-select" class="form-input text-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                            <option value="">🤖 自动选择（使用第一个支持图片的模型）</option>
+                        </select>
+                        <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                            💡 提示：需要先在"模型配置"中勾选支持图片的模型
+                        </div>
+                    </div>
+                    
                     <!-- 壁纸设置 -->
                     <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
                         <h3 class="font-semibold mb-2" data-i18n="wallpaper_title">壁纸设置</h3>
@@ -489,7 +503,11 @@
             <img id="preview-image" src="" alt="图片预览" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl">
         </div>
     </div>
-    <script src="/static/script.js?v=20251028221000"></script>
+    <script>
+        // 启用调试模式
+        window.DEBUG = true;
+    </script>
+    <script src="/static/script.js?v=20251031003000"></script>
 </body>
 </html>
 

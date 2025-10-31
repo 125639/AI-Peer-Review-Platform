@@ -32,6 +32,10 @@ class ProviderModel(BaseModel):
 
 router = APIRouter()
 
+@router.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str, None]:
     try:
         orch = Orchestrator()

@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+
+# Data snapshots (container will mount its own volume)
+!/data/.gitkeep
+
+# Node (if ever added)
+node_modules/
+
+# Docker build leftovers
+*.tar
+
+# Misc
+*.swp
+*.swo
+

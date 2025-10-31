@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  ai-app:
+    build:
+      context: ..
+      dockerfile: docker文件/Dockerfile
+    container_name: ai-chat-app
+    ports:
+      - "8000:8000"
+    volumes:
+      # 持久化数据
+      - ai-data:/app/data
+      # 如果需要开发时热重载，取消下面注释
+      # - ../:/app
+    env_file:
+      - ../.env
+    environment:
+      # 在这里设置环境变量，或使用.env文件
+      - PYTHONUNBUFFERED=1
+      - APP_HOST=${APP_HOST:-0.0.0.0}
+      - APP_PORT=${APP_PORT:-8000}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-network
+
+volumes:
+  ai-data:
+    driver: local
+
+networks:
+  ai-network:
+    driver: bridge
+

@@ -178,6 +178,8 @@ const i18nDict = {
         lang_title: "语言设置",
         lang_zh: "简体中文",
         lang_en: "English",
+        ocr_model_title: "图片文字识别模型",
+        ocr_model_tip: "选择用于识别图片文字的模型（仅显示支持图片的模型）",
         wallpaper_title: "壁纸设置",
         upload_wallpaper_btn: "上传壁纸",
         wallpaper_opacity: "透明度",
@@ -243,6 +245,8 @@ const i18nDict = {
         lang_title: "Language",
         lang_zh: "简体中文",
         lang_en: "English",
+        ocr_model_title: "OCR Model",
+        ocr_model_tip: "Select the model for image text recognition (only vision models shown)",
         wallpaper_title: "Wallpaper",
         upload_wallpaper_btn: "Upload Wallpaper",
         wallpaper_opacity: "Opacity",
@@ -392,7 +396,7 @@ function setLang(lang) {
 
 // ===== 设置页面语言切换事件监听 =====
 document.addEventListener('DOMContentLoaded', () => {
-    log.info('DOM loaded, initializing v16.0.0...');
+    log.info('DOM loaded, initializing v17.0.0...');
     
     const API_BASE_URL = window.location.origin;
     let conversationHistory = [];
@@ -400,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isGenerating = false;
     let pendingOcrText = null;
     
-    // === DOM元素引用 ===
+    // === DOM元素引用（带错误检查）===
     const addProviderForm = document.getElementById('add-provider-form');
     const providerListDiv = document.getElementById('provider-list');
     const modelListContainer = document.getElementById('model-list-container');
@@ -424,6 +428,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeIconMoon = document.getElementById('theme-icon-moon');
     const themeText = document.getElementById('theme-text');
     
+    // 检查关键元素是否存在
+    const criticalElements = [
+        'sidebar', 'questionInput', 'submitBtn', 'chatLog'
+    ];
+    
+    const missingElements = criticalElements.filter(id => !document.getElementById(id));
+    if (missingElements.length > 0) {
+        log.error(`Critical elements missing: ${missingElements.join(', ')}`);
+    }
+    
     log.info('Elements loaded:', { 
         submitBtn: !!submitBtn,
         stopBtn: !!stopBtn,
@@ -432,34 +446,64 @@ document.addEventListener('DOMContentLoaded', () => {
         addPromptForm: !!addPromptForm
     });
     
-    // 检查标签页按钮是否存在
+    // === 标签页切换 ===
     const tabButtons = document.querySelectorAll('.tab-btn');
-    log.info(`Tab buttons found: ${tabButtons.length}`);
+    log.info(`Found ${tabButtons.length} tab buttons`);
     tabButtons.forEach((btn, index) => {
         log.info(`Tab button ${index}: ${btn.dataset.tab} - ${btn.textContent.trim()}`);
     });
     
-    // === 标签页切换 ===
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        log.info(`Adding click listener to tab: ${btn.dataset.tab}`);
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
+    if (tabButtons.length === 0) {
+        log.error('No tab buttons found! Check HTML structure.');
+        return;
+    }
+    
+    tabButtons.forEach((btn, index) => {
+        const tabName = btn.dataset.tab;
+        log.info(`Adding click listener to tab ${index + 1}: ${tabName}`);
+        
+        if (!tabName) {
+            log.error(`Tab button ${index + 1} missing data-tab attribute`);
+            return;
+        }
+        
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
             log.info(`Tab clicked: ${tabName}`);
             
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            try {
+                // 移除所有按钮的active类
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // 移除所有内容的active类
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    log.info(`Removing active from: ${content.id}`);
+                    content.classList.remove('active');
+                });
             
-            document.querySelectorAll('.tab-content').forEach(content => {
-                log.info(`Removing active from: ${content.id}`);
-                content.classList.remove('active');
-            });
-        
-            const targetTab = document.getElementById(`${tabName}-tab`);
-            if (targetTab) {
-                targetTab.classList.add('active');
-                log.info(`Tab activated: ${tabName}, Display: ${window.getComputedStyle(targetTab).display}`);
-            } else {
-                log.error(`Tab not found: ${tabName}-tab`);
+                // 激活目标标签页
+                const targetTab = document.getElementById(`${tabName}-tab`);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                    log.info(`Tab activated: ${tabName}, Display: ${window.getComputedStyle(targetTab).display}`);
+                    
+                    // 特殊处理设置标签页
+                    if (tabName === 'settings') {
+                        log.info('Settings tab activated, checking OCR elements...');
+                        setTimeout(() => {
+                            const ocrSetting = document.getElementById('ocr-model-setting');
+                            const ocrSelect = document.getElementById('ocr-model-select');
+                            log.info(`OCR setting element: ${!!ocrSetting}, OCR select: ${!!ocrSelect}`);
+                        }, 100);
+                    }
+                } else {
+                    log.error(`Tab not found: ${tabName}-tab`);
+                }
+            } catch (error) {
+                log.error(`Error switching tabs: ${error.message}`);
             }
         });
     });
@@ -845,12 +889,212 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // === OCR模型选择相关函数 ===
+    // 更新OCR模型选择下拉框
+    function updateOCRModelSelect() {
+        log.info('updateOCRModelSelect called');
+        if (!ocrModelSelect) {
+            log.error('ocrModelSelect element not found');
+            return;
+        }
+        
+        // 保存当前选择
+        const currentSelection = ocrModelSelect.value;
+        
+        // 清空选项（保留第一个"自动选择"）
+        ocrModelSelect.innerHTML = '<option value="">自动选择（使用第一个支持图片的模型）</option>';
+        
+        // 获取所有支持图片的模型
+        const checkboxes = document.querySelectorAll('.model-checkbox:checked');
+        log.info(`Found ${checkboxes.length} checked model checkboxes`);
+        const visionModels = [];
+        
+        checkboxes.forEach(cb => {
+            const modelValue = cb.value; // 格式: provider::model
+            const modelName = modelValue.split('::')[1] || modelValue;
+            
+            // 判断是否支持图片识别
+            if (modelValue.includes('vision') || 
+                modelValue.includes('gemini') || 
+                modelValue.includes('gpt-4o') ||
+                modelValue.includes('claude-3')) {
+                visionModels.push({
+                    value: modelValue,
+                    label: modelValue
+                });
+            }
+        });
+        
+        // 添加到下拉框
+        log.info(`Adding ${visionModels.length} vision models to OCR selector`);
+        visionModels.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.value;
+            option.textContent = model.label;
+            ocrModelSelect.appendChild(option);
+        });
+        
+        // 恢复之前的选择（如果该模型仍然存在）
+        if (currentSelection) {
+            const optionExists = Array.from(ocrModelSelect.options).some(opt => opt.value === currentSelection);
+            if (optionExists) {
+                ocrModelSelect.value = currentSelection;
+            }
+        }
+        
+        // 如果没有可用模型，禁用选择框
+        if (visionModels.length === 0) {
+            ocrModelSelect.disabled = true;
+            ocrModelSelect.innerHTML = '<option value="">无可用的图片识别模型</option>';
+        } else {
+            ocrModelSelect.disabled = false;
+        }
+    }
+    
+    // 获取用户选择的OCR模型
+    function getSelectedOCRModel() {
+        // 如果用户手动选择了模型，使用用户选择
+        if (ocrModelSelect && ocrModelSelect.value) {
+            log.info(`使用用户手动选择的OCR模型: ${ocrModelSelect.value}`);
+            return ocrModelSelect.value;
+        }
+        
+        // 否则自动选择第一个支持OCR的模型
+        const checkboxes = document.querySelectorAll('.model-checkbox:checked');
+        if (checkboxes.length === 0) {
+            log.warn('没有选中任何模型');
+            return null;
+        }
+        
+        log.info(`当前选中 ${checkboxes.length} 个模型`);
+        
+        // 优先使用vision模型
+        for (const cb of checkboxes) {
+            const modelValue = cb.value; // 格式: provider::model
+            log.info(`检查模型: ${modelValue}`);
+            
+            // 验证格式
+            if (!modelValue || !modelValue.includes('::')) {
+                log.warn(`模型格式无效: ${modelValue}`);
+                continue;
+            }
+            
+            // 检查是否为vision模型
+            const lowerValue = modelValue.toLowerCase();
+            if (lowerValue.includes('vision') || 
+                lowerValue.includes('gemini') ||
+                lowerValue.includes('gpt-4o') ||
+                lowerValue.includes('gpt-4-turbo') ||
+                lowerValue.includes('claude-3')) {
+                log.info(`自动选择vision模型: ${modelValue}`);
+                return modelValue;
+            }
+        }
+        
+        // 如果没有vision模型，返回null（不使用非vision模型）
+        log.warn('没有找到支持图片识别的vision模型');
+        return null;
+    }
+    
+    // 恢复保存的OCR模型选择
+    function restoreOCRModelSelection() {
+        if (!ocrModelSelect) return;
+        
+        const savedOCRModel = localStorage.getItem('selected_ocr_model');
+        if (savedOCRModel) {
+            // 检查保存的模型是否在当前选项中
+            const optionExists = Array.from(ocrModelSelect.options).some(opt => opt.value === savedOCRModel);
+            if (optionExists) {
+                ocrModelSelect.value = savedOCRModel;
+                log.info(`已恢复OCR模型选择: ${savedOCRModel}`);
+            } else {
+                // 如果保存的模型不存在，清除保存的值
+                localStorage.removeItem('selected_ocr_model');
+                log.warn(`保存的OCR模型 ${savedOCRModel} 不存在，已重置`);
+            }
+        }
+    }
+    
+    // 自动识别图片文字（添加图片时自动触发）
+    async function autoRecognizeImages(files) {
+        if (!files || files.length === 0) return;
+        
+        // 防止并发识别
+        if (isRecognizing) {
+            notification.warning('正在识别中，请等待当前识别完成');
+            return;
+        }
+        
+        const ocrModel = getSelectedOCRModel();
+        if (!ocrModel) {
+            log.warn('OCR模型未配置，跳过自动识别');
+            notification.warning('请先在"模型配置"中勾选至少一个支持图片的模型（如gpt-4o、gemini、vision等）');
+            return;
+        }
+        
+        // 验证模型格式
+        if (!ocrModel.includes('::')) {
+            log.error(`OCR模型格式错误: ${ocrModel}`);
+            notification.error('OCR模型格式错误，请重新配置模型');
+            return;
+        }
+        
+        isRecognizing = true;
+        log.info(`使用OCR模型: ${ocrModel}`);
+        
+        let recognizedText = '';
+        let successCount = 0;
+        notification.info(`开始识别 ${files.length} 张图片...`);
+        
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('ocr_model', ocrModel);
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/ocr`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.ocr_text) {
+                            recognizedText += `\n--- ${file.name} ---\n${data.ocr_text}\n`;
+                            successCount++;
+                            log.info(`图片 ${file.name} 识别成功`);
+                        }
+                    } else {
+                        log.warn(`图片 ${file.name} 识别失败`);
+                    }
+                } catch (error) {
+                    log.error(`图片 ${file.name} 识别异常: ${error}`);
+                }
+            }
+            
+            // 将识别的文字设置为待处理的OCR文本，供后续问题处理使用
+            if (recognizedText) {
+                pendingOcrText = recognizedText.trim();
+                notification.success(`成功识别 ${successCount}/${files.length} 张图片的文字，将在下次提问时使用`);
+            } else {
+                pendingOcrText = null;
+                notification.warning('未能识别到文字内容');
+            }
+        } finally {
+            isRecognizing = false;
+        }
+    }
+    
     // === 渲染模型选择列表 ===
     function renderModelSelection(providers) {
         modelListContainer.innerHTML = '';
         
         if (providers.length === 0) {
             modelListContainer.innerHTML = '<p class="text-xs text-gray-500 p-2">无可用模型</p>';
+            // 更新OCR模型选择器
+            updateOCRModelSelect();
             return;
         }
         
@@ -866,9 +1110,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="checkbox" value="${escapeHtml(modelIdentifier)}" class="model-checkbox form-checkbox h-4 w-4 bg-gray-600 border-gray-500 text-purple-500 focus:ring-purple-500">
                     <span class="text-xs text-gray-300">${escapeHtml(provider.name)} - ${escapeHtml(modelName)}</span>
                 `;
+                
+                // 添加复选框变化事件监听
+                const checkbox = label.querySelector('.model-checkbox');
+                if (checkbox) {
+                    checkbox.addEventListener('change', () => {
+                        updateOCRModelSelect();
+                    });
+                }
+                
                 modelListContainer.appendChild(label);
             });
         });
+        
+        // 初始更新OCR模型选择器
+        updateOCRModelSelect();
+        
+        // 恢复保存的OCR模型选择
+        restoreOCRModelSelection();
     }
     
     // === 添加服务商表单 ===
@@ -1230,9 +1489,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetWallpaperBtn = document.getElementById('wallpaper-reset-btn');
     // 图片选择元素
     const bulkImageInput = document.getElementById('bulk-image-input');
+    // OCR模型选择
+    const ocrModelSelect = document.getElementById('ocr-model-select');
 
     // 累积选中的文件（支持多次选择）
     let accumulatedFiles = [];
+    
+    // OCR识别状态标志（防止并发识别）
+    let isRecognizing = false;
     
     // 图片预览相关函数
     function showImagePreview(file) {
@@ -1373,6 +1637,22 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('[DEBUG displaySelectedFiles] 函数执行完毕');
     }
     
+    // 监听OCR模型选择变化
+    if (ocrModelSelect) {
+        ocrModelSelect.addEventListener('change', () => {
+            const selectedModel = ocrModelSelect.value;
+            if (selectedModel) {
+                localStorage.setItem('selected_ocr_model', selectedModel);
+                notification.success(`已设置OCR模型: ${selectedModel}`);
+                log.info(`OCR模型已设置为: ${selectedModel}`);
+            } else {
+                localStorage.removeItem('selected_ocr_model');
+                notification.info('已设置为自动选择OCR模型');
+                log.info('OCR模型已设置为自动选择');
+            }
+        });
+    }
+    
     // 添加文件到累积列表
     function addFilesToAccumulated(files) {
         console.log('[DEBUG addFilesToAccumulated] 被调用');
@@ -1391,6 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('[DEBUG addFilesToAccumulated] fileArray:', fileArray.map(f => f.name));
         
         let actuallyAdded = 0;
+        const newFiles = [];
         fileArray.forEach(newFile => {
             console.log(`[DEBUG addFilesToAccumulated] 处理文件: ${newFile.name}, 大小: ${newFile.size}`);
             // 检查是否已存在相同文件（根据名称和大小）
@@ -1400,6 +1681,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`[DEBUG addFilesToAccumulated] ${newFile.name} 是否已存在: ${exists}`);
             if (!exists) {
                 accumulatedFiles.push(newFile);
+                newFiles.push(newFile);
                 actuallyAdded++;
                 console.log(`[DEBUG addFilesToAccumulated] ✓ 已添加: ${newFile.name}`);
             } else {
@@ -1417,7 +1699,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const addedCount = actuallyAdded;
         const totalCount = accumulatedFiles.length;
         console.log(`[DEBUG addFilesToAccumulated] 显示通知: 已添加 ${addedCount} 张，当前共 ${totalCount} 张`);
-        notification.info(`已添加 ${addedCount} 张图片，当前共 ${totalCount} 张待识别`);
+        notification.info(`已添加 ${addedCount} 张图片，当前共 ${totalCount} 张`);
+        
+        // 自动识别新添加的图片
+        if (newFiles.length > 0) {
+            autoRecognizeImages(newFiles);
+        }
     }
     
     // 移除指定索引的文件
