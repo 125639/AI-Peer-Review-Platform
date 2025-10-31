@@ -86,9 +86,12 @@ def update_provider_by_name(name: str, data: ProviderModel):
 
 # 提示词管理API
 class PromptModel(BaseModel):
-    name: str = Field(..., min_length=1)
-    critique_prompt: str = Field(..., min_length=1)
-    revision_prompt: str = Field(..., min_length=1)
+    name_zh: str = Field(..., min_length=1)
+    critique_prompt_zh: str = Field(..., min_length=1)
+    revision_prompt_zh: str = Field(..., min_length=1)
+    name_en: str = Field(..., min_length=1)
+    critique_prompt_en: str = Field(..., min_length=1)
+    revision_prompt_en: str = Field(..., min_length=1)
     is_active: Optional[int] = 0
 
 @router.get("/prompts", response_model=List[Dict[str, Any]])
@@ -97,8 +100,10 @@ def get_prompts():
 
 @router.post("/prompts", status_code=201)
 def add_new_prompt(data: PromptModel):
-    if any(p['name'] == data.name for p in db.get_all_prompts()):
-        raise HTTPException(409, f"提示词 '{data.name}' 已存在")
+    # 只校验中英文名称是否重复
+    for p in db.get_all_prompts():
+        if p['name_zh'] == data.name_zh or p['name_en'] == data.name_en:
+            raise HTTPException(409, f"提示词 '{data.name_zh}'/{data.name_en} 已存在")
     db.add_prompt(data.model_dump())
     return {"message": "添加成功"}
 

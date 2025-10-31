@@ -314,8 +314,9 @@
         
         <!-- 标签页导航 -->
         <div class="flex mb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-            <button class="tab-btn active px-4 py-2 text-sm font-medium" data-tab="models">模型配置</button>
-            <button class="tab-btn px-4 py-2 text-sm font-medium" data-tab="prompts">提示词管理</button>
+            <button class="tab-btn active px-4 py-2 text-sm font-medium" data-tab="models" data-i18n="tab_models">模型配置</button>
+            <button class="tab-btn px-4 py-2 text-sm font-medium" data-tab="prompts" data-i18n="tab_prompts">提示词管理</button>
+            <button class="tab-btn px-4 py-2 text-sm font-medium" data-tab="settings" data-i18n="tab_settings">设置</button>
         </div>
         
         <div class="flex-grow min-h-0 flex flex-col">
@@ -327,16 +328,16 @@
                     <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
                         <h3 class="text-md font-semibold mb-2">添加新服务商</h3>
                         <form id="add-provider-form" class="space-y-2">
-                            <input name="name" required class="form-input text-sm" placeholder="自定义唯一名称">
+                            <input name="name" required class="form-input text-sm" placeholder="自定义唯一名称" data-i18n-placeholder="prompt_name">
                             <select name="type" required class="form-input text-sm">
-                                <option value="" disabled selected>选择服务商类型</option>
-                                <option value="OpenAI">OpenAI 兼容型</option>
-                                <option value="Gemini">Google Gemini</option>
+                                <option value="" disabled selected data-i18n-option="select_provider_type">选择服务商类型</option>
+                                <option value="OpenAI" data-i18n-option="openai_compatible">OpenAI 兼容型</option>
+                                <option value="Gemini" data-i18n-option="gemini">Google Gemini</option>
                             </select>
-                            <input name="api_key" type="password" required class="form-input text-sm" placeholder="API Key">
-                            <input name="api_base" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)">
-                            <input name="models" required class="form-input text-sm" placeholder="模型列表 (逗号分隔)">
-                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors">添加</button>
+                            <input name="api_key" type="password" required class="form-input text-sm" placeholder="API Key" data-i18n-placeholder="api_key">
+                            <input name="api_base" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)" data-i18n-placeholder="api_base">
+                            <input name="models" required class="form-input text-sm" placeholder="模型列表 (逗号分隔)" data-i18n-placeholder="model_list">
+                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors" data-i18n-btn="add_btn">添加</button>
                         </form>
                     </div>
                 </div>
@@ -354,14 +355,50 @@
                     <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
                         <h3 class="text-md font-semibold mb-2">添加新提示词</h3>
                         <form id="add-prompt-form" class="space-y-2">
-                            <input name="name" required class="form-input text-sm" placeholder="提示词名称">
-                            <label class="text-xs text-gray-500 dark:text-gray-400">评审提示词（使用{question}、{target}、{answer}作为占位符）</label>
-                            <textarea name="critique_prompt" required class="form-input text-sm h-32" placeholder="评审提示词..."></textarea>
-                            <label class="text-xs text-gray-500 dark:text-gray-400">修订提示词（使用{original}、{feedback}作为占位符）</label>
-                            <textarea name="revision_prompt" required class="form-input text-sm h-32" placeholder="修订提示词..."></textarea>
-                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors">添加</button>
+                            <input name="name" required class="form-input text-sm" placeholder="提示词名称" data-i18n-placeholder="prompt_name">
+                            <label class="text-xs text-gray-500 dark:text-gray-400" data-i18n="review_instruction">评审提示词（使用{question}、{target}、{answer}作为占位符）</label>
+                            <textarea name="critique_prompt" required class="form-input text-sm h-32" placeholder="评审提示词..." data-i18n-placeholder="review_placeholder"></textarea>
+                            <label class="text-xs text-gray-500 dark:text-gray-400" data-i18n="revise_instruction">修订提示词（使用{original}、{feedback}作为占位符）</label>
+                            <textarea name="revision_prompt" required class="form-input text-sm h-32" placeholder="修订提示词..." data-i18n-placeholder="revise_placeholder"></textarea>
+                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors" data-i18n-btn="add_btn">添加</button>
                         </form>
                     </div>
+                </div>
+            </div>
+            <!-- 新 增的设置标签页 -->
+            <div id="settings-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
+                <div class="space-y-6">
+                    <h2 class="section-title text-xl font-bold text-black dark:text-gray-300" data-i18n="settings_title">界面设置</h2>
+                    <!-- 语言设置 -->
+                    <div id="lang-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2" data-i18n="lang_title">语言设置</h3>
+                        <label>
+                            <input type="radio" name="ui-lang" value="zh" checked> <span data-i18n="lang_zh">简体中文</span>
+                        </label>
+                        <label class="ml-6">
+                            <input type="radio" name="ui-lang" value="en"> <span data-i18n="lang_en">English</span>
+                        </label>
+                    </div>
+                    <!-- 壁纸设置 -->
+                    <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2" data-i18n="wallpaper_title">壁纸设置</h3>
+                        <div class="mb-3">
+                            <input type="file" id="wallpaper-upload" accept="image/*" style="display:inline-block">
+                            <button id="wallpaper-upload-btn" class="ml-2 font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 transition-colors" data-i18n="upload_wallpaper_btn">上传壁纸</button>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20" data-i18n="wallpaper_opacity">透明度</label>
+                            <input type="range" min="10" max="100" value="100" step="1" id="wallpaper-opacity" style="vertical-align:middle">
+                            <span id="wallpaper-opacity-label">100%</span>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20" data-i18n="wallpaper_brightness">亮度</label>
+                            <input type="range" min="20" max="200" value="100" step="1" id="wallpaper-brightness">
+                            <span id="wallpaper-brightness-label">100%</span>
+                        </div>
+                        <button id="wallpaper-reset-btn" class="font-bold py-1 px-3 text-sm rounded-md bg-gray-400 hover:bg-gray-500 transition-colors" data-i18n="reset_wallpaper_btn">重置壁纸</button>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -376,30 +413,28 @@
         </div>
         <div id="chat-log" class="flex-1 p-6 overflow-y-auto w-full"></div>
         <div class="p-4 border-t border-gray-300 dark:border-gray-700 flex-shrink-0">
+                <!-- 图片标签显示区域 -->
+                <div id="selected-files-display" class="mb-3 px-2" style="display:none;">
+                    <div id="file-names-list" class="flex flex-wrap gap-2"></div>
+                </div>
+                
                 <div class="flex items-center space-x-2">
-                    <div id="image-preview-container" class="hidden relative mr-2">
-                        <img id="image-preview" src="" alt="Image preview" class="h-10 w-10 object-cover rounded-md border border-gray-400 dark:border-gray-600"/>
-                        <button id="delete-image-btn" title="删除图片" class="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold leading-none">&times;</button>
-                    </div>
                     <button id="new-chat-btn" title="开始新对话" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 flex-shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15"/>
                         </svg>
                     </button>
-                    <textarea id="question-input" rows="1" class="form-input flex-1 resize-none" placeholder="输入您的问题，或粘贴图片..."></textarea>
+                    
+                    <!-- 图片选择按钮 -->
+                    <label for="bulk-image-input" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer flex-shrink-0" title="选择图片">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </label>
+                    <input type="file" id="bulk-image-input" accept="image/*" multiple class="hidden">
+                    
+                    <textarea id="question-input" rows="1" class="form-input flex-1 resize-none" placeholder="输入您的问题，或粘贴图片..." data-i18n-placeholder="input_placeholder"></textarea>
 
-                    <!-- OCR 区域：选择模型 + 上传图片 + 识别按钮 -->
-                    <div class="flex items-center gap-2">
-                        <select id="ocr-model-select" class="form-input text-xs w-40" title="选择用于识别图片文字的模型">
-                            <option value="" selected>选择OCR模型</option>
-                        </select>
-                        <label id="upload-label" class="px-2 py-1 text-xs rounded-md bg-gray-200 dark:bg-gray-700 cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <input id="image-input" type="file" accept="image/*" class="hidden" />
-                            上传图片
-                        </label>
-                        <button id="ocr-btn" title="识别图片文字" class="px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 disabled:opacity-50">识别图片</button>
-                    </div>
-                
                 <!-- 发送按钮 -->
                 <button id="submit-btn" class="p-3 rounded-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 flex-shrink-0">
                     <svg id="submit-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -420,6 +455,20 @@
             </div>
         </div>
     </main>
+    
+    <!-- 图片预览模态框 -->
+    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center" style="display: none;">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <img id="preview-image" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="图片预览">
+            <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
+                <span id="preview-filename">文件名</span>
+            </div>
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm">
+                按任意键或点击任意位置关闭
+            </div>
+        </div>
+    </div>
+    
     <div id="details-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="flex justify-between items-center mb-4">
@@ -427,6 +476,17 @@
                 <button id="close-modal-btn" class="text-3xl font-bold p-2 leading-none rounded-full hover:bg-gray-700">&times;</button>
             </div>
             <div id="process-details-container" class="space-y-6"></div>
+        </div>
+    </div>
+    
+    <!-- 图片预览模态框 -->
+    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-95 z-[9999]" style="display:none;">
+        <div class="relative w-full h-full flex flex-col items-center justify-center">
+            <div class="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-6 py-3 rounded-lg text-sm shadow-2xl z-10">
+                <span id="preview-filename" class="font-semibold text-lg"></span>
+                <span class="ml-4 text-gray-300">按任意键或点击关闭</span>
+            </div>
+            <img id="preview-image" src="" alt="图片预览" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl">
         </div>
     </div>
     <script src="/static/script.js?v=20251028221000"></script>

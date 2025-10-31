@@ -6,5 +6,6 @@ google-generativeai
 python-dotenv
 packaging
 python-multipart
+Pillow
 
 
