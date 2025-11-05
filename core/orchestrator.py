@@ -1,13 +1,12 @@
 import asyncio
-import logging
 import re
 from typing import List, Dict, Any, AsyncGenerator, Optional
 
 from .models import create_model_instance
+from .logging import get_logger
 import core.database as db
 
-# 配置日志记录器
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 常量定义
 MAX_SCORE_PER_FIELD = 3
@@ -30,11 +29,13 @@ DISCLAIMER_PATTERNS = [
 
 class Orchestrator:
     async def process_query_stream(
-        self, 
-        user_question: str, 
-        selected_models: List[str], 
-        history: List[Dict[str, str]], 
-        ocr_text: Optional[str] = None
+        self,
+        user_question: str,
+        selected_models: List[str],
+        history: List[Dict[str, str]],
+        ocr_text: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+        tool_choice: Optional[str] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         yield {"type": "status", "data": "正在初始化模型..."}
         
@@ -58,27 +59,36 @@ class Orchestrator:
         ocr_text_clean = ocr_text.strip() if ocr_text else ""
         user_question_clean = user_question.strip()
 
+        # 如果有工具可用，添加工具使用提示
+        tool_hint = ""
+        if tools:
+            tool_hint = "\n\n【重要提示】如果你需要获取实时信息、最新资讯、事实核查或当前事件，请使用 network_search 工具进行网络搜索。"
+        
         if ocr_text_clean:
             combined_question = (
                 "【OCR识别文本】\n"
                 f"{ocr_text_clean}\n\n"
                 "【强制要求】\n"
-                "1. 你无法直接查看原图，禁止回复“无法看到图片”“我是文本AI”等托辞。\n"
+                "1. 你无法直接查看原图，禁止回复'无法看到图片''我是文本AI'等托辞。\n"
                 "2. 必须完全依据上方OCR文字做出专业分析，指出优点、缺陷与改进建议。\n"
                 "3. 如OCR文字存在缺漏，请说明缺失信息对判断的影响。\n"
                 "4. 结尾至少提出两条具体改进建议。\n"
-                f"【用户问题】{user_question_clean or '请基于OCR内容给出详细、严格的专业评估。'}"
+                f"【用户问题】{user_question_clean or '请基于OCR内容给出详细、严格的专业评估。'}\n"
+                f"{tool_hint}"
             )
         else:
-            combined_question = user_question_clean or "请结合已有对话提供回答。"
+            combined_question = (user_question_clean or "请结合已有对话提供回答。") + tool_hint
 
         messages = history + [{"role": "user", "content": combined_question}]
         
         yield {"type": "status", "data": "第一轮：生成初始答案..."}
         
         initial_answers = {}
-        results = await asyncio.gather(*[model.generate(messages) for model in active_models], return_exceptions=True)
-        
+        results = await asyncio.gather(
+            *[model.generate(messages, tools=tools, tool_choice=tool_choice) for model in active_models],
+            return_exceptions=True
+        )
+
         for model, result in zip(active_models, results):
             initial_answers[model.name] = f"[失败: {result}]" if isinstance(result, Exception) else result
             yield {"type": "initial_answer_complete", "model_name": model.name, "answer": initial_answers[model.name]}
@@ -161,7 +171,7 @@ class Orchestrator:
             "data": {"best_answer": best_answer, "process_details": details}
         }
     
-    async def _generate_critique(self, critic_model, target_name: str, question: str, answer: str, ocr_text: str = "") -> tuple:
+    async def _generate_critique(self, critic_model, target_name: str, question: str, answer: str, ocr_text: str = "", tools: Optional[List[Dict]] = None, tool_choice: Optional[str] = None) -> tuple:
         active_prompt = db.get_active_prompt()
         prompt = self._build_critique_prompt(question, target_name, answer, active_prompt, ocr_text)
 
@@ -186,9 +196,13 @@ class Orchestrator:
                     attempt=attempts
                 )
 
-            critique_text = await critic_model.generate([
-                {"role": "user", "content": current_prompt}
-            ])
+            critique_text = await critic_model.generate(
+                messages=[
+                    {"role": "user", "content": current_prompt}
+                ],
+                tools=tools,
+                tool_choice=tool_choice,
+            )
 
             parsed = self._parse_critique(critique_text, critic_model.name)
 
@@ -204,10 +218,10 @@ class Orchestrator:
 
         return (critique_text, parsed)
     
-    async def _generate_revision(self, model, original: str, critiques: List[Dict]) -> str:
+    async def _generate_revision(self, model, original: str, critiques: List[Dict], tools: Optional[List[Dict]] = None, tool_choice: Optional[str] = None) -> str:
         active_prompt = db.get_active_prompt()
         prompt = self._build_revision_prompt(original, critiques, active_prompt)
-        return await model.generate([{"role": "user", "content": prompt}])
+        return await model.generate([{"role": "user", "content": prompt}], tools=tools, tool_choice=tool_choice)
     
     def _make_final_decision(self, initial: Dict, critiques: Dict, revised: Dict):
         scores = {}

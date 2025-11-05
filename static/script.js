@@ -18,17 +18,21 @@ const log = {
     },
     error: (message) => {
         // 错误日志总是显示
-        const logElement = document.getElementById('debug-log') || createDebugLogElement();
-        const timestamp = new Date().toISOString();
-        logElement.innerHTML += `<div class="log-entry error">[${timestamp}] [ERROR] ${message}</div>`;
-        logElement.scrollTop = logElement.scrollHeight;
+        if (typeof document !== 'undefined') {
+            const logElement = document.getElementById('debug-log') || createDebugLogElement();
+            const timestamp = new Date().toISOString();
+            logElement.innerHTML += `<div class="log-entry error">[${timestamp}] [ERROR] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
     },
     warn: (message) => {
         // 警告日志总是显示
-        const logElement = document.getElementById('debug-log') || createDebugLogElement();
-        const timestamp = new Date().toISOString();
-        logElement.innerHTML += `<div class="log-entry warn">[${timestamp}] [WARN] ${message}</div>`;
-        logElement.scrollTop = logElement.scrollHeight;
+        if (typeof document !== 'undefined') {
+            const logElement = document.getElementById('debug-log') || createDebugLogElement();
+            const timestamp = new Date().toISOString();
+            logElement.innerHTML += `<div class="log-entry warn">[${timestamp}] [WARN] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
     }
 };
 
@@ -310,7 +314,7 @@ const i18nDict = {
 };
 
 function getLang() {
-    return window.UI_LANG || localStorage.getItem('ui-lang') || 'zh';
+    return window.currentLang || localStorage.getItem('ui-lang') || 'zh';
 }
 
 function getI18n(key, params) {
@@ -318,7 +322,7 @@ function getI18n(key, params) {
     let text = (i18nDict[lang] && i18nDict[lang][key]) || key;
     if(params) {
         Object.keys(params).forEach(k=>{
-            text = text.replace(new RegExp(`\\{${k}\\}`,'g'), params[k]);
+            text = text.replace(new RegExp(`\{${k}\}`,'g'), params[k]);
         });
     }
     return text;
@@ -326,7 +330,7 @@ function getI18n(key, params) {
 
 // 2. 增加刷新所有 i18n 标签/placeholder/option 的辅助函数
 function refreshAllI18n() {
-    const lang = window.UI_LANG || localStorage.getItem('ui-lang') || 'zh';
+    const lang = window.currentLang || localStorage.getItem('ui-lang') || 'zh';
     // 通用文本
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -351,7 +355,7 @@ function refreshAllI18n() {
 
 // 3. setLang里调用 refreshAllI18n 同步刷新
 function setLang(lang) {
-    window.UI_LANG = lang;
+    window.currentLang = lang;
     localStorage.setItem('ui-lang', lang);
     refreshAllI18n();
     // 选中
@@ -396,7 +400,14 @@ function setLang(lang) {
 
 // ===== 设置页面语言切换事件监听 =====
 document.addEventListener('DOMContentLoaded', () => {
-    log.info('DOM loaded, initializing v17.0.0...');
+    try {
+        log.info('DOM loaded, initializing v17.0.0...');
+
+        // 隐藏调试状态栏，表示JavaScript正常加载
+        const debugStatus = document.getElementById('debug-status');
+        if (debugStatus) {
+            debugStatus.classList.add('hidden');
+        }
     
     const API_BASE_URL = window.location.origin;
     let conversationHistory = [];
@@ -406,8 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === DOM元素引用（带错误检查）===
     const addProviderForm = document.getElementById('add-provider-form');
-    const providerListDiv = document.getElementById('provider-list');
-    const modelListContainer = document.getElementById('model-list-container');
+    const providerListDiv = document.getElementById('provider-list') || document.getElementById('provider-list-settings');
+    const modelListContainer = document.getElementById('model-list-container') || document.getElementById('model-list-settings');
     const questionInput = document.getElementById('question-input');
     const submitBtn = document.getElementById('submit-btn');
     const stopBtn = document.getElementById('stop-btn');
@@ -419,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.getElementById('close-modal-btn');
     const processDetailsContainer = document.getElementById('process-details-container');
     const addPromptForm = document.getElementById('add-prompt-form');
-    const promptListDiv = document.getElementById('prompt-list');
+    const promptListDiv = document.getElementById('prompt-list') || document.getElementById('prompt-list-settings');
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
@@ -446,7 +457,37 @@ document.addEventListener('DOMContentLoaded', () => {
         promptListDiv: !!promptListDiv,
         addPromptForm: !!addPromptForm
     });
+
+    // 导出若干关键 DOM 引用到全局，供内联脚本或其他模块访问
+    // 这样可以避免 index.html 中的内联脚本在不同作用域下引用未定义变量导致的错误
+    try {
+        window.chatLog = chatLog;
+        window.questionInput = questionInput;
+        window.submitBtn = submitBtn;
+        window.stopBtn = stopBtn;
+        window.newChatBtn = newChatBtn;
+    } catch (e) {
+        log.warn('Failed to attach globals: ' + e.message);
+    }
+
+    log.info('Initialization completed successfully');
+
+    } catch (error) {
+        log.error('Critical initialization error: ' + error.message);
+        console.error('Critical initialization error:', error);
+
+        // 显示错误状态
+        const debugStatus = document.getElementById('debug-status');
+        if (debugStatus) {
+            debugStatus.textContent = 'JavaScript初始化失败: ' + error.message + ' - 请检查控制台获取详细信息';
+            debugStatus.classList.remove('hidden');
+            debugStatus.classList.remove('bg-red-600');
+            debugStatus.classList.add('bg-red-800');
+        }
+        // 即使有错误也继续执行，不return
+    }
     
+    try {
     // === 标签页切换 ===
     const tabButtons = document.querySelectorAll('.tab-btn');
     log.info(`Found ${tabButtons.length} tab buttons`);
@@ -1111,6 +1152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 log.warn(`⚠️ 未识别到任何文字内容，清空 pendingOcrText`);
                 notification.warning('未能识别到文字内容');
             }
+        } catch (error) {
+            log.error(`OCR处理异常:`, error);
+            notification.error(`OCR处理失败: ${error.message}`);
         } finally {
             isRecognizing = false;
             log.info(`🏁 OCR识别流程结束`);
@@ -1296,9 +1340,30 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('[processQuery] pendingOcrText 长度:', pendingOcrText ? pendingOcrText.length : 'null');
             console.log('[processQuery] pendingOcrText 内容:', pendingOcrText ? pendingOcrText.substring(0, 200) : 'null');
             
+            // 检查是否启用AI互评模式
+            // Linus 风格：明确的判断逻辑，避免隐式转换
+            const peerReviewSetting = localStorage.getItem('sw_peer-review-mode');
+            const isPeerReviewMode = peerReviewSetting !== '0'; // 只有明确设置为 '0' 时才禁用
+            console.log(
+                "%c[processQuery] 关键检查点\n- localStorage (sw_peer-review-mode): '%s' (typeof %s)\n- 是否启用互评: %s\n- 原始选中模型: %s",
+                'color:#ff4444;font-weight:bold;',
+                peerReviewSetting,
+                typeof peerReviewSetting,
+                isPeerReviewMode ? '是' : '否',
+                selectedModels.join(', ')
+            );
+
+            const modelsToUse = isPeerReviewMode ? selectedModels : [selectedModels[0]];
+            console.log(
+                "%c[processQuery] 最终使用模型: %s (数量: %d)",
+                'color:#ff4444;font-weight:bold;',
+                modelsToUse.join(', '),
+                modelsToUse.length
+            );
+            
             const requestBody = {
                 question: question,
-                selected_models: selectedModels,
+                selected_models: modelsToUse,
                 history: conversationHistory.slice(0, -1),
                 ocr_text: pendingOcrText || null
             };
@@ -1382,9 +1447,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 assistantBubble.innerHTML = markdownToHtml(finalAnswer);
                 conversationHistory.push({ role: 'assistant', content: finalAnswer });
                 
+                // 添加答案操作按钮
+                if (typeof createAnswerActions === 'function') {
+                    createAnswerActions(assistantBubble, finalAnswer, question);
+                }
+                
                 if (finalDetails.length > 0) {
-            createActionButtons(finalDetails, assistantBubble, userBubble, question);
-        }
+                    createActionButtons(finalDetails, assistantBubble, userBubble, question);
+                }
     }
     
     function createActionButtons(finalDetails, assistantBubble, userBubble, question) {
@@ -1871,6 +1941,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     loadAndRenderAll();
     log.info('Initialization complete v17.0.0');
+    
+    } catch (error) {
+        console.error('Error in tab/language initialization:', error);
+        log.error('Tab/language initialization error: ' + error.message);
+    }
 });
 
 

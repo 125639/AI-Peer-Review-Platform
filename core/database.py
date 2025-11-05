@@ -2,6 +2,10 @@ import os
 import sqlite3
 from typing import List, Dict, Any, Optional
 
+from .logging import get_logger
+
+logger = get_logger(__name__)
+
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'providers.db')
 
 def get_db_connection() -> sqlite3.Connection:
@@ -25,20 +29,29 @@ def initialize_database():
             CREATE TABLE IF NOT EXISTS prompts (
                 id INTEGER PRIMARY KEY,
                 name_zh TEXT NOT NULL,
+                description_zh TEXT,
                 critique_prompt_zh TEXT NOT NULL,
                 revision_prompt_zh TEXT NOT NULL,
                 name_en TEXT NOT NULL,
+                description_en TEXT,
                 critique_prompt_en TEXT NOT NULL,
                 revision_prompt_en TEXT NOT NULL,
-                is_active INTEGER DEFAULT 0
+                tags TEXT, -- JSON string of tags
+                version INTEGER DEFAULT 1,
+                parent_id INTEGER, -- For versioning, links to parent prompt
+                status TEXT DEFAULT 'active', -- draft, active, archived, ab_test
+                is_active INTEGER DEFAULT 0, -- For active prompt in use
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         # 插入默认提示词(中英文)
         conn.execute('''
-            INSERT OR IGNORE INTO prompts (id, name_zh, critique_prompt_zh, revision_prompt_zh, name_en, critique_prompt_en, revision_prompt_en, is_active)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+            INSERT OR IGNORE INTO prompts (id, name_zh, description_zh, critique_prompt_zh, revision_prompt_zh, name_en, description_en, critique_prompt_en, revision_prompt_en, is_active)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+''', (
             '严格差异化评分标准',
+            '严格、挑剔的同行评审标准，确保评分具有区分度',
             '''你是一位严格、挑剔的同行评审专家。【重要：必须严格按照指定格式输出，否则评审无效】
 
 【评审任务】
@@ -106,6 +119,7 @@ def initialize_database():
 - 如果模型表现很好（如9-12分），要诚实给高分；如果有缺陷（如5-8分），不要勉强给9分''',
             '根据评审意见改进以下答案，只输出改进后的完整答案，不要添加任何解释。\n\n原答案:\n{original}\n\n评审意见:\n{feedback}\n\n改进要求：针对评审指出的具体缺陷进行修正，补充遗漏的内容，优化表达和逻辑，显著增加实用性。必须体现出明确的改进。',
             'Strict Differentiated Scoring Standards',
+            'Strict and critical peer review standards ensuring score differentiation',
             '''You are a strict and critical peer reviewer. [IMPORTANT: Your output MUST strictly follow the specified format or it will be considered invalid.]
 
 [Review Task]

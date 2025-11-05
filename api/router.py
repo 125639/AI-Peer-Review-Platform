@@ -12,6 +12,10 @@ from pydantic import BaseModel, Field
 
 from core.orchestrator import Orchestrator
 import core.database as db
+from core.searxng import get_searxng_client
+from core.logging import get_logger
+
+logger = get_logger(__name__)
 
 class ChatMessage(BaseModel):
     role: str
@@ -43,11 +47,47 @@ router = APIRouter()
 def health_check():
     return {"status": "ok"}
 
+def get_available_tools():
+    """获取可用的工具列表"""
+    from core.config import get_config
+    config = get_config()
+    tools = []
+    
+    # 如果 SearXNG 已启用，添加搜索工具
+    if config.searxng.enabled:
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": "network_search",
+                "description": "使用 SearXNG 元搜索引擎进行网络搜索。当你需要获取实时信息、最新资讯、事实核查或当前事件时，应该使用此工具。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "搜索关键词或问题"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        })
+    
+    return tools
+
 async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str, None]:
     try:
         orch = Orchestrator()
         history_dicts = [msg.model_dump() for msg in request.history] if request.history else []
-        async for event in orch.process_query_stream(request.question, request.selected_models, history_dicts, request.ocr_text):
+        # 获取可用工具
+        tools = get_available_tools()
+        async for event in orch.process_query_stream(
+            request.question, 
+            request.selected_models, 
+            history_dicts, 
+            request.ocr_text,
+            tools=tools if tools else None
+        ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.01)
     except Exception as e:
@@ -152,9 +192,6 @@ async def ocr_image(
     file: UploadFile = File(...),
     ocr_model: str = Form(...)
 ):
-    import logging
-    logger = logging.getLogger(__name__)
-    
     logger.info(f"=== [/api/ocr] OCR请求开始 ===")
     logger.info(f"[/api/ocr] 文件名: {file.filename}")
     logger.info(f"[/api/ocr] Content-Type: {file.content_type}")
@@ -235,7 +272,7 @@ async def ocr_image(
             raise HTTPException(400, f"不支持的服务商类型: {provider_type}")
 
         if not text:
-            logger.warn(f"[/api/ocr] OCR返回空文本")
+            logger.warning(f"[/api/ocr] OCR返回空文本")
             text = ""
         
         logger.info(f"[/api/ocr] 返回结果: ocr_text长度={len(text)}")
@@ -243,5 +280,112 @@ async def ocr_image(
     except Exception as e:
         logger.error(f"[/api/ocr] OCR识别失败: {e}", exc_info=True)
         raise HTTPException(500, f"OCR 识别失败: {e}")
+
+
+# ==================== SearXNG 搜索引擎 API ====================
+
+class SearchRequest(BaseModel):
+    """搜索请求模型"""
+    query: str = Field(..., min_length=1, description="搜索关键词")
+    categories: Optional[List[str]] = Field(None, description="搜索分类，如 ['general', 'images']")
+    engines: Optional[List[str]] = Field(None, description="搜索引擎，如 ['google', 'bing']")
+    language: Optional[str] = Field('zh-CN', description="语言代码")
+    page: Optional[int] = Field(1, ge=1, le=10, description="页码（1-10）")
+    time_range: Optional[str] = Field(None, description="时间范围，如 'day', 'week', 'month'")
+
+@router.post("/search")
+async def search(request: SearchRequest):
+    """
+    执行搜索查询
+
+    使用 SearXNG 元搜索引擎进行隐私友好的网络搜索
+    """
+    logger.info(f"[/api/search] 搜索请求: '{request.query}'")
+
+    try:
+        client = get_searxng_client()
+        results = await client.search(
+            query=request.query,
+            categories=request.categories,
+            engines=request.engines,
+            language=request.language,
+            page=request.page,
+            time_range=request.time_range
+        )
+
+        logger.info(f"[/api/search] 搜索完成: {len(results.get('results', []))} 条结果")
+        return JSONResponse(results)
+
+    except Exception as e:
+        logger.error(f"[/api/search] 搜索失败: {e}", exc_info=True)
+        raise HTTPException(500, f"搜索失败: {str(e)}")
+
+@router.post("/search/ai-summary")
+async def search_with_ai_summary(request: SearchRequest):
+    """
+    执行搜索并返回AI摘要上下文
+
+    返回搜索结果以及格式化的AI摘要上下文
+    """
+    logger.info(f"[/api/search/ai-summary] AI搜索请求: '{request.query}'")
+
+    try:
+        client = get_searxng_client()
+        results = await client.search_with_ai_summary(request.query)
+
+        logger.info(f"[/api/search/ai-summary] 搜索完成，返回 {len(results.get('results', []))} 条结果")
+        return JSONResponse(results)
+
+    except Exception as e:
+        logger.error(f"[/api/search/ai-summary] AI搜索失败: {e}", exc_info=True)
+        raise HTTPException(500, f"AI搜索失败: {str(e)}")
+
+# SearXNG 配置管理
+class SearXNGConfigModel(BaseModel):
+    url: str = Field(..., min_length=1)
+    enabled: bool = True
+
+@router.get("/config/searxng")
+def get_searxng_config():
+    """获取 SearXNG 配置"""
+    from core.config import get_config
+    config = get_config()
+    return {
+        "url": config.searxng.url,
+        "enabled": config.searxng.enabled
+    }
+
+@router.put("/config/searxng")
+def update_searxng_config(data: SearXNGConfigModel):
+    """更新 SearXNG 配置"""
+    import os
+    import json
+    config_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'searxng_config.json')
+    
+    try:
+        config_data = {
+            "url": data.url,
+            "enabled": data.enabled
+        }
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, ensure_ascii=False, indent=2)
+        
+        # 重新加载配置
+        from core.config import _config
+        if _config:
+            _config.searxng.url = data.url
+            _config.searxng.enabled = data.enabled
+        
+        # 重置 SearXNG 客户端和配置缓存
+        import core.searxng as searxng_module
+        searxng_module._searxng_client = None
+        from core.config import _config as config_module
+        config_module._config = None  # 强制下次调用时重新加载
+        
+        logger.info(f"SearXNG 配置已更新: {data.url}, enabled={data.enabled}")
+        return {"message": "配置已保存"}
+    except Exception as e:
+        logger.error(f"保存 SearXNG 配置失败: {e}", exc_info=True)
+        raise HTTPException(500, f"保存配置失败: {str(e)}")
 
 

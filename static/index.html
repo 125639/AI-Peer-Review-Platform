@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI工厂 v14.0 - OCR增强版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>AI Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         /* 现代深色主题样式 - 仿照参考图界面 */
         :root {
@@ -56,46 +58,80 @@
             background-image: none !important;
         }
         
-        /* 有壁纸时，让侧边栏和主内容区保持适度不透明以确保文字清晰 */
+        /* 有壁纸时，侧边栏恢复原来的样式，确保内容清晰可见 */
         body.has-wallpaper .sidebar {
             background: rgba(37, 41, 50, 0.85) !important;
             backdrop-filter: blur(10px) !important;
         }
         
-        body.has-wallpaper .main-content {
-            background: rgba(26, 29, 35, 0.85) !important;
+        html:not(.dark) body.has-wallpaper .sidebar {
+            background: rgba(237, 242, 247, 0.92) !important;
             backdrop-filter: blur(10px) !important;
         }
         
-        html:not(.dark) body.has-wallpaper .sidebar {
-            background: rgba(237, 242, 247, 0.92) !important;
+        /* 主内容区 - 适度透明，保持壁纸可见但确保文字可读 */
+        body.has-wallpaper .main-content {
+            background: rgba(26, 29, 35, 0.70) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .main-content {
-            background: rgba(247, 250, 252, 0.92) !important;
+            background: rgba(247, 250, 252, 0.80) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
-        /* 有壁纸时，输入区域也使用适度不透明以确保文字清晰 */
+        /* 有壁纸时，输入区域更不透明以确保输入框清晰可见 */
         body.has-wallpaper .input-area {
             background: rgba(37, 41, 50, 0.85) !important;
             backdrop-filter: blur(10px) !important;
-            border-top: 1px solid rgba(74, 85, 104, 0.5) !important;
+            border-top: 1px solid rgba(74, 85, 104, 0.4) !important;
         }
         
         body.has-wallpaper .input-container {
-            background: rgba(50, 58, 70, 0.9) !important;
+            background: rgba(50, 58, 70, 0.90) !important;
             backdrop-filter: blur(5px) !important;
-            border: 1px solid rgba(58, 69, 83, 0.6) !important;
+            border: 1px solid rgba(58, 69, 83, 0.5) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-area {
             background: rgba(237, 242, 247, 0.92) !important;
-            border-top: 1px solid rgba(203, 213, 224, 0.5) !important;
+            backdrop-filter: blur(10px) !important;
+            border-top: 1px solid rgba(203, 213, 224, 0.4) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-container {
             background: rgba(255, 255, 255, 0.95) !important;
-            border: 1px solid rgba(226, 232, 240, 0.6) !important;
+            border: 1px solid rgba(226, 232, 240, 0.5) !important;
+            backdrop-filter: blur(5px) !important;
+        }
+        
+        /* 有壁纸时，聊天消息增加背景不透明度，确保文字清晰可读 */
+        body.has-wallpaper .chat-message {
+            background: rgba(50, 58, 70, 0.75) !important;
+            backdrop-filter: blur(8px) !important;
+        }
+        
+        body.has-wallpaper .chat-message.user {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(147, 51, 234, 0.75)) !important;
+            border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        body.has-wallpaper .chat-message.assistant {
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.80), rgba(59, 130, 246, 0.75)) !important;
+            border: 1px solid rgba(147, 51, 234, 0.25) !important;
+        }
+        
+        html:not(.dark) body.has-wallpaper .chat-message {
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(8px) !important;
+        }
+        
+        html:not(.dark) body.has-wallpaper .chat-message.user {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.80), rgba(147, 51, 234, 0.70)) !important;
+        }
+        
+        html:not(.dark) body.has-wallpaper .chat-message.assistant {
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.75), rgba(59, 130, 246, 0.70)) !important;
         }
         
         body::before {
@@ -336,11 +372,12 @@
         }
 
         .evaluation-process {
-            background: rgba(37, 41, 50, 0.6);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            padding: 12px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(147, 51, 234, 0.02));
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            border-radius: 12px;
+            padding: 16px;
             margin-top: 12px;
+            backdrop-filter: blur(10px);
         }
 
         /* 简要模式：只显示简洁的行 */
@@ -442,24 +479,213 @@
         /* 聊天消息样式 */
         .chat-message {
             background: var(--bg-card);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
             border-left: 4px solid var(--accent-purple);
-            animation: fadeIn 0.3s ease-in;
-            max-width: 75%;
+            animation: slideInUp 0.4s ease-out;
+            max-width: 80%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+        
+        .chat-message::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+            border-radius: 16px;
+            pointer-events: none;
         }
         
         .chat-message.user {
-            background: rgba(66, 153, 225, 0.15);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.05));
             border-left-color: var(--accent-blue);
             margin-left: auto;
             margin-right: 0;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .chat-message.user::after {
+            content: '👤';
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 14px;
+            opacity: 0.6;
         }
         
         .chat-message.assistant {
             margin-right: auto;
             margin-left: 0;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.08), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(147, 51, 234, 0.15);
+        }
+        
+        .chat-message.assistant::after {
+            content: '🤖';
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 14px;
+            opacity: 0.6;
+        }
+        
+        @keyframes slideInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
+        }
+        
+        @keyframes fadeInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* AI回答操作按钮样式 */
+        .answer-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 8px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out 0.3s forwards;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            background: rgba(55, 65, 81, 0.8);
+            border: 1px solid rgba(75, 85, 99, 0.6);
+            border-radius: 6px;
+            color: #d1d5db;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .action-btn:hover {
+            background: rgba(75, 85, 99, 0.9);
+            border-color: rgba(156, 163, 175, 0.8);
+            color: #f3f4f6;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .action-btn.primary {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+        
+        .action-btn.primary:hover {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.6);
+            color: #dbeafe;
+        }
+        
+        .action-btn.danger {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+        
+        .action-btn.danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.6);
+            color: #fecaca;
+        }
+        
+        .action-btn-icon {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
+        }
+        
+        .action-btn-text {
+            white-space: nowrap;
+        }
+        
+        .action-divider {
+            width: 1px;
+            height: 16px;
+            background: rgba(75, 85, 99, 0.6);
+            margin: 0 2px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .answer-actions {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            
+            .action-btn {
+                padding: 4px 6px;
+                font-size: 10px;
+            }
+            
+            .action-btn-text {
+                display: none;
+            }
+            
+            .action-btn-icon {
+                width: 14px;
+                height: 14px;
+            }
+            
+            .action-divider {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .answer-actions {
+                justify-content: center;
+            }
         }
         
         @keyframes fadeIn {
@@ -528,7 +754,60 @@
         .toolbar-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+        }
+        
+        /* 快速模式切换按钮 */
+        .quick-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(147, 51, 234, 0.1);
+            border: 1px solid rgba(147, 51, 234, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .quick-mode-toggle:hover {
+            background: rgba(147, 51, 234, 0.15);
+            border-color: rgba(147, 51, 234, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .mode-icon {
+            font-size: 12px;
+        }
+        
+        .mode-text {
+            color: var(--text-secondary);
+            transition: color 0.2s ease;
+        }
+        
+        .mode-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #6b7280;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-indicator.active {
+            background: #3b82f6;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+        
+        .quick-mode-toggle.disabled {
+            background: rgba(107, 114, 128, 0.1);
+            border-color: rgba(107, 114, 128, 0.3);
+        }
+        
+        .quick-mode-toggle.disabled .mode-indicator {
+            background: #6b7280;
+            box-shadow: none;
         }
 
         .toolbar-btn {
@@ -568,7 +847,7 @@
             padding-top: 8px;
         }
 
-        #submit-btn {
+        #submit-btn, #stop-btn {
             background: var(--accent-blue);
             color: white;
             border: none;
@@ -587,6 +866,16 @@
         #submit-btn:disabled {
             background: var(--bg-tertiary);
             cursor: not-allowed;
+        }
+        #stop-btn {
+            background: #ef4444;
+            margin-left: 8px;
+        }
+        #stop-btn:hover {
+            background: #dc2626;
+        }
+        #stop-btn.hidden {
+            display: none;
         }
 
         /* 隐藏内容 */
@@ -611,23 +900,57 @@
         .model-checkbox {
             display: flex;
             align-items: center;
-            padding: 8px;
+            padding: 12px;
             background: var(--bg-primary);
             border: 1px solid var(--border-light);
-            border-radius: 6px;
-            margin-bottom: 4px;
+            border-radius: 8px;
+            margin-bottom: 6px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .model-checkbox::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+            transition: left 0.5s ease;
         }
         
         .model-checkbox:hover {
             background: var(--bg-card);
             border-color: var(--accent-blue);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+            transform: translateY(-1px);
+        }
+        
+        .model-checkbox:hover::before {
+            left: 100%;
         }
         
         .model-checkbox input[type="checkbox"] {
-            margin-right: 8px;
+            margin-right: 12px;
             accent-color: var(--accent-blue);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        .model-checkbox input[type="checkbox"]:checked + span {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+        
+        .model-checkbox span {
+            font-size: 13px;
+            transition: all 0.2s ease;
+            z-index: 1;
+            position: relative;
         }
         
         /* 设置区域中的服务商卡片 */
@@ -795,6 +1118,8 @@
             align-items: center;
             padding: 15px 0;
             border-bottom: 1px solid var(--border-light);
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-light);
         }
         
         .settings-item:last-child {
@@ -846,6 +1171,60 @@
         
         .settings-toggle.active::after {
             transform: translateX(20px);
+        }
+        
+        /* 互评模式专用样式 */
+        .peer-review-setting {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(147, 51, 234, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .peer-review-setting::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #3b82f6, #9333ea);
+            opacity: 0.6;
+        }
+        
+        .mode-icon {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        .mode-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6, #9333ea);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+        
+        /* 互评模式关闭时的样式 */
+        .peer-review-setting.disabled .mode-badge {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+        
+        .peer-review-setting.disabled::before {
+            background: linear-gradient(90deg, #6b7280, #4b5563);
         }
         
         .settings-select {
@@ -930,9 +1309,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
     </style>
 </head>
 <body>
+    <div id="debug-status" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-900 text-white text-xs px-4 py-2 rounded shadow z-50">
+        JavaScript 正在初始化...
+    </div>
     <div class="flex h-screen">
         <!-- 侧边栏 -->
         <aside class="sidebar w-80 flex-shrink-0" id="sidebar">
@@ -997,7 +1380,7 @@
         <main class="main-content flex-1">
             <!-- 侧边栏收起按钮 -->
             <button class="sidebar-toggle" id="sidebar-toggle">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg id="sidebar-toggle-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
@@ -1056,6 +1439,11 @@
                             <input type="file" id="image-input" accept="image/*" style="display: none;">
                         </div>
                         <div class="toolbar-group">
+                            <div class="quick-mode-toggle" id="quick-mode-toggle">
+                                <span class="mode-icon">🤖</span>
+                                <span class="mode-text" id="quick-mode-text">互评</span>
+                                <div class="mode-indicator active" id="mode-indicator"></div>
+                            </div>
                             <span class="text-xs text-gray-500" id="token-counter">0/2000</span>
                         </div>
                     </div>
@@ -1067,8 +1455,19 @@
                     ></textarea>
                     <div class="submit-btn-wrapper">
                         <button id="submit-btn" disabled>
+                            <span id="submit-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                                </svg>
+                            </span>
+                            <svg id="loading-spinner" class="hidden w-5 h-5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                            </svg>
+                        </button>
+                        <button id="stop-btn" class="hidden" title="停止生成">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </button>
                     </div>
@@ -1076,6 +1475,8 @@
             </div>
         </main>
     </div>
+    
+    <!-- 手动网络搜索面板已取消，改由 AI 自动根据需要触发实时检索 -->
     
     <!-- 设置模态框 -->
     <div class="settings-modal" id="settings-modal">
@@ -1273,6 +1674,17 @@
                         <h3 class="settings-group-title" data-i18n="modelSelection">模型选择</h3>
                         <div id="model-list-settings" class="space-y-2 max-h-64 overflow-y-auto"></div>
                     </div>
+
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="translationSettings">翻译设置</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="translationTargetLanguage">翻译目标语言</div>
+                                <div class="settings-item-desc" data-i18n="translationTargetDesc">翻译按钮默认输出的语言。</div>
+                            </div>
+                            <select class="settings-select" id="translation-target-select"></select>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 提示词管理 -->
@@ -1305,7 +1717,50 @@
                     <p class="settings-subtitle" data-i18n="advancedSettings">仅在你知道自己在做什么时使用。</p>
                     
                     <div class="settings-group">
+                        <h3 class="settings-group-title">🔍 网络搜索 (SearXNG)</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title">启用网络搜索</div>
+                                <div class="settings-item-desc">启用后可以使用网络搜索功能</div>
+                            </div>
+                            <div class="settings-toggle active" data-setting="searxng-enabled">
+                                <div class="toggle-slider">
+                                    <span class="toggle-text">ON</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title">SearXNG 接口地址</div>
+                                <div class="settings-item-desc">SearXNG 服务器地址，例如: https://searx.be</div>
+                            </div>
+                            <input type="text" id="searxng-url-input" class="form-input" placeholder="https://searx.be" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <button id="save-searxng-config-btn" class="btn-primary text-sm mt-2">保存配置</button>
+                    </div>
+                    
+                    <div class="settings-group">
                         <h3 class="settings-group-title" data-i18n="debug">调试</h3>
+                        <div class="settings-item peer-review-setting">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title">
+                                    <span class="mode-icon">🤖</span>
+                                    AI互评模式
+                                    <span class="mode-badge" id="peer-review-badge">多模型互评</span>
+                                </div>
+                                <div class="settings-item-desc">
+                                    <span class="mode-desc" id="peer-review-desc">
+                                        启用：多个模型互相评审，产生更优质的答案
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="settings-toggle active" data-setting="peer-review-mode">
+                                <div class="toggle-slider">
+                                    <span class="toggle-text">ON</span>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="settings-item">
                             <div class="settings-item-info">
                                 <div class="settings-item-title" data-i18n="debugMode">调试模式</div>
@@ -1380,8 +1835,105 @@
             </div>
         </div>
     </div>
+
+    <!-- 互评过程详情模态框 -->
+    <div id="details-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center">
+        <div class="relative w-11/12 max-w-4xl max-h-[80vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6">
+            <button id="close-modal-btn" class="absolute top-3 right-3 text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            <h3 class="text-xl font-semibold mb-4 text-gray-100">互评详情</h3>
+            <div id="process-details-container" class="space-y-4 text-sm text-gray-200"></div>
+        </div>
+    </div>
     
-    <script src="/static/script.js?v=20251031003000"></script>
+    <script>
+        // 全局懒加载占位与延迟加载器
+        (function(){
+            const placeholder = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="100%" height="100%" fill="#2d3748"/></svg>');
+
+            function deferDispatch(el, name='lazyload'){
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(()=> el.dispatchEvent(new Event(name)));
+                } else {
+                    setTimeout(()=> el.dispatchEvent(new Event(name)), 50);
+                }
+            }
+
+            function loadImage(img){
+                if (img.dataset.src) img.src = img.dataset.src;
+                if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+                img.removeAttribute('data-src');
+                img.removeAttribute('data-srcset');
+                img.addEventListener('load', ()=> deferDispatch(img), { once: true });
+            }
+
+            function loadBg(el){
+                const url = el.dataset.bg;
+                if (!url) return;
+                el.style.backgroundImage = url;
+                delete el.dataset.bg;
+                deferDispatch(el);
+            }
+
+            function prepare(){
+                // 处理 <img>：保留真实地址到 data-src，使用占位符，并确保 loading=lazy
+                document.querySelectorAll('img').forEach(img=>{
+                    try {
+                        if (img.getAttribute('loading') !== 'lazy') img.setAttribute('loading','lazy');
+                        if (!img.dataset.src) {
+                            const src = img.getAttribute('src');
+                            const srcset = img.getAttribute('srcset');
+                            if (src) {
+                                img.dataset.src = src;
+                                img.src = placeholder;
+                            }
+                            if (srcset) {
+                                img.dataset.srcset = srcset;
+                                img.removeAttribute('srcset');
+                            }
+                        }
+                    } catch(e){/* defensive */}
+                });
+
+                // 处理内联 background-image 或者已有 data-bg
+                document.querySelectorAll('[data-bg], [style*="background-image"]').forEach(el=>{
+                    try {
+                        if (!el.dataset.bg) {
+                            const style = el.getAttribute('style') || '';
+                            const m = style.match(/background-image\s*:\s*url\(([^)]+)\)/i);
+                            if (m) {
+                                const url = m[1].trim().replace(/^['"]|['"]$/g,'');
+                                el.dataset.bg = `url('${url}')`;
+                                el.style.backgroundImage = `url('${placeholder}')`;
+                            }
+                        } else {
+                            // 已有 data-bg，先显示占位
+                            el.style.backgroundImage = `url('${placeholder}')`;
+                        }
+                    } catch(e){/* defensive */}
+                });
+
+                // 观察并加载
+                const io = new IntersectionObserver((entries, obs)=>{
+                    entries.forEach(entry=>{
+                        if (!entry.isIntersecting) return;
+                        const t = entry.target;
+                        if (t.tagName === 'IMG') {
+                            loadImage(t);
+                        } else {
+                            loadBg(t);
+                        }
+                        obs.unobserve(t);
+                    });
+                }, { rootMargin: '200px' });
+
+                document.querySelectorAll('img[data-src], [data-bg]').forEach(el=> io.observe(el));
+            }
+
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', prepare);
+            else prepare();
+        })();
+    </script>
+    <script src="/static/script.js?v=20251103030300"></script>
     <script>
         // 设置系统 - 保证在任何调用 S 之前定义
         const S = {
@@ -1492,6 +2044,86 @@
                 document.getElementById(sectionId).classList.add('active');
             });
         });
+        
+        // SearXNG 配置管理
+        const searxngUrlInput = document.getElementById('searxng-url-input');
+        const searxngEnabledToggle = document.querySelector('[data-setting="searxng-enabled"]');
+        const saveSearxngConfigBtn = document.getElementById('save-searxng-config-btn');
+        
+        // 加载 SearXNG 配置
+        async function loadSearxngConfig() {
+            try {
+                const response = await fetch('/api/config/searxng');
+                if (response.ok) {
+                    const config = await response.json();
+                    if (searxngUrlInput) searxngUrlInput.value = config.url || 'https://searx.be';
+                    if (searxngEnabledToggle) {
+                        if (config.enabled) {
+                            searxngEnabledToggle.classList.add('active');
+                        } else {
+                            searxngEnabledToggle.classList.remove('active');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('加载 SearXNG 配置失败:', error);
+            }
+        }
+        
+        // 保存 SearXNG 配置
+        async function saveSearxngConfig() {
+            const url = searxngUrlInput ? searxngUrlInput.value.trim() : 'https://searx.be';
+            const enabled = searxngEnabledToggle ? searxngEnabledToggle.classList.contains('active') : true;
+            
+            if (!url) {
+                alert('请输入 SearXNG 接口地址');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/config/searxng', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        enabled: enabled
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('配置已保存');
+                    // 重新加载配置
+                    await loadSearxngConfig();
+                } else {
+                    const error = await response.json();
+                    alert('保存失败: ' + (error.detail || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存 SearXNG 配置失败:', error);
+                alert('保存失败: ' + error.message);
+            }
+        }
+        
+        // 绑定事件
+        if (saveSearxngConfigBtn) {
+            saveSearxngConfigBtn.addEventListener('click', saveSearxngConfig);
+        }
+        
+        if (searxngEnabledToggle) {
+            searxngEnabledToggle.addEventListener('click', () => {
+                searxngEnabledToggle.classList.toggle('active');
+            });
+        }
+        
+        // 打开设置时加载配置
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                loadSearxngConfig();
+            });
+        }
         
         // 侧边栏收起功能
         const sidebar = document.getElementById('sidebar');
@@ -1625,6 +2257,16 @@
                 evaluationDisplayDesc: '选择向用户展示的模型互评细节层级。',
                 behavior: '行为',
                 modelConfig: '模型配置',
+                translationSettings: '翻译设置',
+                translationTargetLanguage: '翻译目标语言',
+                translationTargetDesc: '翻译按钮默认输出的语言。',
+                translationOptionAuto: '自动（跟随界面语言）',
+                translationOptionZh: '简体中文',
+                translationOptionEn: 'English',
+                translationOptionJa: '日语',
+                translationOptionKo: '韩语',
+                translationOptionFr: '法语',
+                translationOptionDe: '德语',
                 promptManagement: '提示词管理',
                 manageProviders: '管理服务商',
                 managePrompts: '管理提示词',
@@ -1730,6 +2372,16 @@
                 evaluationDisplayDesc: 'Select the level of model evaluation details to display to users.',
                 behavior: 'Behavior',
                 modelConfig: 'Model Configuration',
+                translationSettings: 'Translation Settings',
+                translationTargetLanguage: 'Target Language',
+                translationTargetDesc: 'Default language used by the translate action.',
+                translationOptionAuto: 'Auto (follow UI language)',
+                translationOptionZh: 'Chinese',
+                translationOptionEn: 'English',
+                translationOptionJa: 'Japanese',
+                translationOptionKo: 'Korean',
+                translationOptionFr: 'French',
+                translationOptionDe: 'German',
                 promptManagement: 'Prompt Management',
                 manageProviders: 'Manage Providers',
                 managePrompts: 'Manage Prompts',
@@ -1753,6 +2405,50 @@
                 historyRetention: 'History Retention (days)'
             }
         };
+
+        const translationLanguageOrder = [
+            { value: 'auto', labelKey: 'translationOptionAuto' },
+            { value: 'zh', labelKey: 'translationOptionZh' },
+            { value: 'en', labelKey: 'translationOptionEn' },
+            { value: 'ja', labelKey: 'translationOptionJa' },
+            { value: 'ko', labelKey: 'translationOptionKo' },
+            { value: 'fr', labelKey: 'translationOptionFr' },
+            { value: 'de', labelKey: 'translationOptionDe' }
+        ];
+
+        const translationPromptNameMap = {
+            zh: '中文',
+            en: 'English',
+            ja: '日语',
+            ko: '韩语',
+            fr: '法语',
+            de: '德语'
+        };
+
+        function getConfiguredTranslationTarget(uiLang) {
+            const saved = S.get('translation_target', 'auto') || 'auto';
+            if (saved === 'auto') {
+                return uiLang === 'zh' ? 'en' : 'zh';
+            }
+            return saved;
+        }
+
+        function renderTranslationSelect(uiLang) {
+            const select = document.getElementById('translation-target-select');
+            if (!select) return;
+            const t = i18n[uiLang] || i18n.zh;
+            const saved = S.get('translation_target', 'auto') || 'auto';
+            const allowedValues = translationLanguageOrder.map(item => item.value);
+            const initialValue = allowedValues.includes(saved) ? saved : 'auto';
+            select.innerHTML = '';
+            translationLanguageOrder.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.value;
+                option.textContent = t[item.labelKey] || item.value;
+                select.appendChild(option);
+            });
+            select.value = initialValue;
+        }
         
         function applyLanguage(l) {
             const t = i18n[l] || i18n.zh;
@@ -1912,7 +2608,21 @@
             }
             
             // 保存当前语言以便后续使用
+            renderTranslationSelect(l);
             window.currentLang = l;
+            
+            // 更新所有包含"管理服务商"和"管理提示词"的按钮
+            document.querySelectorAll('button').forEach(btn => {
+                if (btn.textContent.includes('管理服务商')) {
+                    btn.textContent = t.manageProviders;
+                } else if (btn.textContent.includes('管理提示词')) {
+                    btn.textContent = t.managePrompts;
+                } else if (btn.textContent.includes('上传壁纸')) {
+                    btn.textContent = t.uploadWallpaper;
+                } else if (btn.textContent.includes('恢复默认') || btn.textContent.includes('重置壁纸')) {
+                    btn.textContent = t.resetWallpaper;
+                }
+            });
             
             // 如果时间戳功能已开启，重新应用时间戳（更新语言格式）
             if (S.get('sw_timestamps') === '1') {
@@ -1921,6 +2631,14 @@
                 }, 100);
             }
         }
+        const translationTargetSelect = document.getElementById('translation-target-select');
+        if (translationTargetSelect) {
+            renderTranslationSelect(lang.value);
+            translationTargetSelect.addEventListener('change', (e) => {
+                S.set('translation_target', e.target.value);
+            });
+        }
+
         applyLanguage(lang.value);
         
         // 初始化时加载历史记录（如果有）
@@ -1928,6 +2646,11 @@
         window.addEventListener('DOMContentLoaded', () => {
             // 延迟执行，确保所有元素都已加载
             setTimeout(() => {
+                // 如果首次加载且用户未设置过时间戳开关，默认启用
+                if (S.get('sw_timestamps') === null || S.get('sw_timestamps') === undefined || S.get('sw_timestamps') === '') {
+                    S.set('sw_timestamps', '1');
+                }
+                // 应用时间戳设置
                 if (S.get('sw_timestamps') === '1') {
                     applyToggleSetting('timestamps', true);
                 }
@@ -1979,8 +2702,18 @@
             const k = 'sw_' + t.dataset.setting;
             const setting = t.dataset.setting;
             
-            // 恢复状态
-            if (S.get(k) === '1') t.classList.add('active');
+            // 恢复状态 - Linus 风格：确保 localStorage 与 UI 同步
+            const savedValue = S.get(k);
+            if (savedValue === '1') {
+                t.classList.add('active');
+            } else if (savedValue === '0') {
+                t.classList.remove('active');
+            } else {
+                // 首次加载，根据 HTML 默认状态保存到 localStorage
+                const isActive = t.classList.contains('active');
+                S.set(k, isActive ? '1' : '0');
+                console.log(`[开关初始化] ${setting}: ${isActive ? '启用' : '禁用'}`);
+            }
             
             // 初始化应用
             applyToggleSetting(setting, t.classList.contains('active'));
@@ -1990,6 +2723,7 @@
                 t.classList.toggle('active');
                 const active = t.classList.contains('active');
                 S.set(k, active ? '1' : '0');
+                console.log(`[开关切换] ${setting}: ${active ? '启用' : '禁用'}`);
                 applyToggleSetting(setting, active);
             };
         });
@@ -2070,6 +2804,38 @@
                         sidebar.classList.remove('collapsed');
                     }
                     break;
+                case 'peer-review-mode':
+                    // AI互评模式开关
+                    console.log('AI互评模式:', active ? '已启用（多模型互评）' : '已关闭（单模型直答）');
+                    
+                    // 更新UI状态
+                    const peerReviewSetting = document.querySelector('.peer-review-setting');
+                    const modeBadge = document.getElementById('peer-review-badge');
+                    const modeDesc = document.getElementById('peer-review-desc');
+                    
+                    if (peerReviewSetting && modeBadge && modeDesc) {
+                        if (active) {
+                            peerReviewSetting.classList.remove('disabled');
+                            modeBadge.textContent = '多模型互评';
+                            modeBadge.style.background = 'linear-gradient(135deg, #3b82f6, #9333ea)';
+                            modeDesc.innerHTML = '✨ 启用：多个模型互相评审，产生更优质的答案';
+                        } else {
+                            peerReviewSetting.classList.add('disabled');
+                            modeBadge.textContent = '单模型直答';
+                            modeBadge.style.background = 'linear-gradient(135deg, #6b7280, #4b5563)';
+                            modeDesc.innerHTML = '⚡ 关闭：使用第一个选中的模型直接回答（更快速）';
+                        }
+                    }
+                    
+                    // 实时提示用户
+                    if (typeof notification !== 'undefined') {
+                        if (active) {
+                            notification.success('🤖 已启用 AI 互评模式！多个模型会互相评审并优化答案');
+                        } else {
+                            notification.info('⚡ 已关闭 AI 互评模式！将使用第一个选中的模型直接回答');
+                        }
+                    }
+                    break;
                 case 'auto-save':
                     console.log('自动保存:', active);
                     break;
@@ -2093,9 +2859,372 @@
             document.getElementById('question-input').focus();
         };
         
+        // 快速模式切换
+        const quickModeToggle = document.getElementById('quick-mode-toggle');
+        const quickModeText = document.getElementById('quick-mode-text');
+        const modeIndicator = document.getElementById('mode-indicator');
+        
+        function updateQuickModeDisplay() {
+            const peerReviewEnabled = S.get('sw_peer-review-mode', '1') === '1';
+            if (peerReviewEnabled) {
+                quickModeToggle.classList.remove('disabled');
+                modeIndicator.classList.add('active');
+                quickModeText.textContent = '互评';
+                quickModeToggle.title = '当前：AI互评模式（点击切换到单模型模式）';
+            } else {
+                quickModeToggle.classList.add('disabled');
+                modeIndicator.classList.remove('active');
+                quickModeText.textContent = '单模型';
+                quickModeToggle.title = '当前：单模型模式（点击切换到AI互评模式）';
+            }
+        }
+        
+        quickModeToggle.onclick = () => {
+            const currentMode = S.get('sw_peer-review-mode', '1');
+            const newMode = currentMode === '1' ? '0' : '1';
+            S.set('sw_peer-review-mode', newMode);
+            
+            // 同步更新设置页面的开关
+            const settingsToggle = document.querySelector('[data-setting="peer-review-mode"]');
+            if (settingsToggle) {
+                if (newMode === '1') {
+                    settingsToggle.classList.add('active');
+                } else {
+                    settingsToggle.classList.remove('active');
+                }
+            }
+            
+            // 应用设置变化
+            applyToggleSetting('peer-review-mode', newMode === '1');
+            updateQuickModeDisplay();
+        };
+        
+        // 初始化快速模式显示
+        updateQuickModeDisplay();
+        
+        // 创建答案操作按钮
+        function createAnswerActions(answerDiv, answerText, originalQuestion) {
+            // 避免重复创建
+            const existingActions = answerDiv.querySelector('.answer-actions');
+            if (existingActions) {
+                existingActions.remove();
+            }
+            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'answer-actions';
+            
+            // 复制按钮
+            const copyBtn = createActionButton('📋', '复制', 'primary', () => {
+                navigator.clipboard.writeText(answerText).then(() => {
+                    notification.success('答案已复制到剪贴板');
+                }).catch(() => {
+                    notification.error('复制失败');
+                });
+            });
+            
+            // 重新生成按钮
+            const regenBtn = createActionButton('🔄', '重新生成', '', () => {
+                // 重新发送相同的问题
+                let questionToUse = originalQuestion;
+                
+                // 如果 originalQuestion 为空，尝试从DOM元素中获取
+                if (!questionToUse || !questionToUse.trim()) {
+                    // 向上查找最近的用户消息或AI消息
+                    let parent = answerDiv.parentElement;
+                    while (parent && parent !== document.body) {
+                        if (parent.classList.contains('chat-message')) {
+                            questionToUse = parent.getAttribute('data-original-question') || '';
+                            if (questionToUse) break;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    
+                    // 如果还是找不到，尝试从用户消息的文本内容中提取
+                    if (!questionToUse || !questionToUse.trim()) {
+                        const userMessages = document.querySelectorAll('.chat-message.user');
+                        if (userMessages.length > 0) {
+                            const lastUserMsg = userMessages[userMessages.length - 1];
+                            const questionDiv = lastUserMsg.querySelector('div > div:last-child');
+                            if (questionDiv) {
+                                questionToUse = questionDiv.textContent.trim();
+                            }
+                        }
+                    }
+                }
+                
+                if (questionToUse && questionToUse.trim()) {
+                    const input = document.getElementById('question-input');
+                    const submit = document.getElementById('submit-btn');
+                    if (input && submit) {
+                        input.value = questionToUse.trim();
+                        input.disabled = false;
+                        submit.disabled = false;
+                        // 触发输入事件，确保按钮状态正确更新
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        // 稍等片刻再点击，确保状态已更新
+                        setTimeout(() => {
+                            submit.click();
+                        }, 50);
+                    } else {
+                        console.error('无法找到输入框或提交按钮');
+                        if (typeof notification !== 'undefined' && notification.error) {
+                            notification.error('无法重新生成，请刷新页面后重试');
+                        } else {
+                            alert('无法重新生成，请刷新页面后重试');
+                        }
+                    }
+                } else {
+                    if (typeof notification !== 'undefined' && notification.error) {
+                        notification.error('无法找到原始问题，无法重新生成');
+                    } else {
+                        alert('无法找到原始问题，无法重新生成');
+                    }
+                }
+            });
+            
+            // 插入代码按钮（如果答案包含代码）
+            if (answerText.includes('```') || answerText.includes('`')) {
+                const insertBtn = createActionButton('📝', '插入代码', '', () => {
+                    // 提取代码块
+                    const codeBlocks = answerText.match(/```[\s\S]*?```/g) || [];
+                    const inlineCode = answerText.match(/`[^`]+`/g) || [];
+                    
+                    let allCode = '';
+                    codeBlocks.forEach(block => {
+                        allCode += block.replace(/```\w*\n?/g, '').replace(/```/g, '') + '\n\n';
+                    });
+                    inlineCode.forEach(code => {
+                        allCode += code.replace(/`/g, '') + '\n';
+                    });
+                    
+                    navigator.clipboard.writeText(allCode.trim()).then(() => {
+                        notification.success('代码已复制到剪贴板');
+                    });
+                });
+                actionsDiv.appendChild(insertBtn);
+            }
+            
+            // 翻译按钮
+            const translateBtn = createActionButton('🌐', '翻译', '', async () => {
+                try {
+                    const uiLang = window.currentLang || 'zh';
+                    const targetLang = getConfiguredTranslationTarget(uiLang);
+                    const langName = translationPromptNameMap[targetLang] || targetLang;
+                    
+                    // 使用第一个可用模型进行翻译
+                    const selectedModels = JSON.parse(S.get('models', '[]'));
+                    if (selectedModels.length === 0) {
+                        notification.warning('请先选择至少一个模型');
+                        return;
+                    }
+                    
+                    const translatePrompt = `请将以下内容翻译成${langName}，保持原有格式和结构：\n\n${answerText}`;
+                    
+                    // 创建新的AI消息用于显示翻译结果
+                    const translateMsg = document.createElement('div');
+                    translateMsg.className = 'chat-message assistant';
+                    translateMsg.innerHTML = `
+                        <div class="font-medium mb-1 text-purple-400">🌐 翻译结果 · ${langName}</div>
+                        <div class="response-content">
+                            <div style="color: var(--text-secondary); font-size: 13px; margin-bottom: 8px;">正在翻译...</div>
+                        </div>
+                    `;
+                    chatLog.appendChild(translateMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                    
+                    const resp = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            question: translatePrompt,
+                            selected_models: [selectedModels[0]],
+                            history: []
+                        })
+                    });
+                    
+                    if (resp.ok) {
+                        const reader = resp.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = '';
+                        const responseContent = translateMsg.querySelector('.response-content');
+                        
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop();
+                            
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    try {
+                                        const data = JSON.parse(line.slice(6));
+                                        if (data.type === 'final_result') {
+                                            const translatedText = data.data?.best_answer || '翻译失败';
+                                            responseContent.innerHTML = `<div style="white-space: pre-wrap; line-height: 1.6;">${translatedText}</div>`;
+                                            createAnswerActions(responseContent, translatedText, '');
+                                        }
+                                    } catch (e) {}
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    notification.error('翻译失败：' + error.message);
+                }
+            });
+            
+            // 编辑优化按钮
+            const optimizeBtn = createActionButton('✨', '编辑优化', '', async () => {
+                const optimizePrompt = `请对以上内容进行编辑优化，使其更加清晰、准确、易懂：\n\n${answerText}`;
+                questionInput.value = optimizePrompt;
+                notification.info('已将优化提示填入输入框，点击发送开始优化');
+            });
+            
+            // 分隔符
+            const divider1 = document.createElement('div');
+            divider1.className = 'action-divider';
+            
+            const divider2 = document.createElement('div');
+            divider2.className = 'action-divider';
+            
+            // 添加按钮到容器
+            actionsDiv.appendChild(copyBtn);
+            actionsDiv.appendChild(regenBtn);
+            actionsDiv.appendChild(divider1);
+            actionsDiv.appendChild(translateBtn);
+            actionsDiv.appendChild(optimizeBtn);
+            actionsDiv.appendChild(divider2);
+            
+            // 更多操作按钮
+            const moreBtn = createActionButton('⋯', '更多', '', () => {
+                const menu = document.createElement('div');
+                menu.className = 'more-actions-menu';
+                menu.style.cssText = `
+                    position: absolute;
+                    bottom: 100%;
+                    right: 0;
+                    background: rgba(17, 24, 39, 0.95);
+                    border: 1px solid rgba(75, 85, 99, 0.6);
+                    border-radius: 8px;
+                    padding: 4px;
+                    min-width: 120px;
+                    backdrop-filter: blur(10px);
+                    z-index: 1000;
+                    animation: fadeInUp 0.2s ease-out;
+                `;
+                
+                const menuItems = [
+                    { icon: '🔍', text: '详细分析', action: () => {
+                        questionInput.value = `请对以下内容进行详细分析：\n\n${answerText}`;
+                        notification.info('已填入分析提示');
+                        menu.remove();
+                    }},
+                    { icon: '📊', text: '总结要点', action: () => {
+                        questionInput.value = `请总结以下内容的要点：\n\n${answerText}`;
+                        notification.info('已填入总结提示');
+                        menu.remove();
+                    }},
+                    { icon: '❓', text: '提出问题', action: () => {
+                        questionInput.value = `基于以下内容，请提出3-5个深入的问题：\n\n${answerText}`;
+                        notification.info('已填入问题提示');
+                        menu.remove();
+                    }}
+                ];
+                
+                menuItems.forEach(item => {
+                    const menuItem = document.createElement('div');
+                    menuItem.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 6px 8px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        color: #d1d5db;
+                        transition: background 0.2s ease;
+                    `;
+                    menuItem.innerHTML = `<span>${item.icon}</span><span>${item.text}</span>`;
+                    menuItem.onmouseover = () => menuItem.style.background = 'rgba(75, 85, 99, 0.5)';
+                    menuItem.onmouseout = () => menuItem.style.background = 'transparent';
+                    menuItem.onclick = item.action;
+                    menu.appendChild(menuItem);
+                });
+                
+                // 点击外部关闭菜单
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target)) {
+                        menu.remove();
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+                
+                moreBtn.style.position = 'relative';
+                moreBtn.appendChild(menu);
+            });
+            
+            actionsDiv.appendChild(moreBtn);
+            
+            // 将操作按钮添加到答案下方
+            answerDiv.appendChild(actionsDiv);
+        }
+        
+        function createActionButton(icon, text, className = '', onClick) {
+            const btn = document.createElement('button');
+            btn.className = `action-btn ${className}`;
+            btn.innerHTML = `
+                <span class="action-btn-icon">${icon}</span>
+                <span class="action-btn-text">${text}</span>
+            `;
+            btn.onclick = onClick;
+            return btn;
+        }
+        
         // 发送消息
         const submitBtn = document.getElementById('submit-btn');
+        const stopBtn = document.getElementById('stop-btn');
         const questionInput = document.getElementById('question-input');
+        
+        // 停止按钮事件监听
+        if (stopBtn) {
+            stopBtn.onclick = () => {
+                if (window.stopGeneration && typeof window.stopGeneration === 'function') {
+                    window.stopGeneration();
+                } else if (window.currentReader) {
+                    try {
+                        window.currentReader.cancel('User requested stop');
+                    } catch (e) {
+                        console.error('Cancel error:', e);
+                    }
+                    window.currentReader = null;
+                }
+                
+                // 恢复UI状态
+                if (submitBtn) {
+                    submitBtn.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                }
+                if (stopBtn) {
+                    stopBtn.classList.add('hidden');
+                }
+                if (questionInput) {
+                    questionInput.disabled = false;
+                }
+                
+                // 显示停止消息
+                const chatLog = document.getElementById('chat-log');
+                if (chatLog) {
+                    const stopMessage = document.createElement('div');
+                    stopMessage.className = 'chat-message assistant';
+                    stopMessage.innerHTML = '<div class="font-medium mb-1 text-purple-400">AI助手</div><div class="text-yellow-400 italic">⚠️ 生成已被用户停止</div>';
+                    chatLog.appendChild(stopMessage);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }
+            };
+        }
 
         questionInput.addEventListener('input', () => {
             if (questionInput.value.trim().length > 0) {
@@ -2110,11 +3239,19 @@
             if (!question) return;
             
             const selectedModels = JSON.parse(S.get('models', '[]'));
-            if (selectedModels.length === 0) {
+            const peerReviewSetting = S.get('sw_peer-review-mode', '1');
+            const isPeerReviewEnabled = peerReviewSetting !== '0';
+            const modelsToUse = isPeerReviewEnabled
+                ? selectedModels
+                : (selectedModels.length > 0 ? [selectedModels[0]] : []);
+
+            if (modelsToUse.length === 0) {
                 const t = i18n[window.currentLang || 'zh'] || i18n.zh;
                 alert(t.selectModelFirst);
                 return;
             }
+
+            console.log('[提交请求] 原始模型数:', selectedModels.length, '互评模式:', isPeerReviewEnabled ? '启用' : '禁用', '实际使用:', modelsToUse.length);
             
             // 添加用户消息
             const chatLog = document.getElementById('chat-log');
@@ -2122,6 +3259,7 @@
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'chat-message user';
             userMsgDiv.setAttribute('data-timestamp', Date.now().toString());
+            userMsgDiv.setAttribute('data-original-question', question); // 保存原始问题
             userMsgDiv.innerHTML = `<div class="font-medium mb-1">${t.user}</div><div>${question}</div>`;
             
             // 如果时间戳功能开启，添加时间戳
@@ -2151,14 +3289,22 @@
             
             chatLog.appendChild(userMsgDiv);
             
+            // 保存原始问题，以便重新生成时使用
+            const savedQuestion = question;
+            
             questionInput.value = '';
             questionInput.disabled = true;
             submitBtn.disabled = true;
+            submitBtn.classList.add('hidden');
+            if (stopBtn) {
+                stopBtn.classList.remove('hidden');
+            }
         
             // 添加AI响应占位
             const aiMsg = document.createElement('div');
             aiMsg.className = 'chat-message assistant';
             aiMsg.setAttribute('data-timestamp', Date.now().toString());
+            aiMsg.setAttribute('data-original-question', savedQuestion); // 在AI消息中也保存原始问题
             const t2 = i18n[window.currentLang || 'zh'] || i18n.zh;
             aiMsg.innerHTML = `<div class="font-medium mb-1 text-purple-400">${t2.aiAssistant}</div><div class="response-content"></div>`;
             chatLog.appendChild(aiMsg);
@@ -2268,9 +3414,27 @@
         responseContent.appendChild(processWrapper);
 
         // Only show process container if there's something to show
-        if (selectedModels.length > 1) {
+        if (modelsToUse.length > 1) {
             const t_start = i18n[window.currentLang || 'zh'] || i18n.zh;
             appendProcessLine(t_start.evaluationStarted);
+        }
+        if (!isPeerReviewEnabled && selectedModels.length > 1) {
+            const statusMsg = document.createElement('div');
+            statusMsg.className = 'mode-status-message';
+            statusMsg.style.cssText = `
+                background: linear-gradient(135deg, #fbbf24, #f59e0b);
+                color: #1f2937;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 600;
+                margin: 8px 0;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            `;
+            statusMsg.innerHTML = '⚡ AI互评模式已关闭：使用单模型快速回答';
+            processWrapper.insertBefore(statusMsg, processContainer);
         }
             try {
                 const resp = await fetch('/api/process', {
@@ -2278,7 +3442,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         question: question,
-                        selected_models: selectedModels,
+                        selected_models: modelsToUse,
                         history: []
                     })
                 });
@@ -2286,7 +3450,10 @@
                 const t_error = i18n[window.currentLang || 'zh'] || i18n.zh;
                 if (!resp.ok) throw new Error(t_error.requestFailed);
                 
+                // 设置 currentReader 以便停止按钮可以取消请求
                 const reader = resp.body.getReader();
+                window.currentReader = reader;
+                
                 const decoder = new TextDecoder();
                 let buffer = '';
                 
@@ -2345,6 +3512,10 @@
                                         const t_no_answer = i18n[window.currentLang || 'zh'] || i18n.zh;
                                         finalAnswerDiv.textContent = result.best_answer || t_no_answer.noAnswerAvailable;
                                         finalAnswerDiv.style.display = 'block';
+                                        
+                                        // 创建答案操作按钮 - 从AI消息元素中获取原始问题
+                                        const savedQuestion = aiMsg.getAttribute('data-original-question') || questionInput.value || '';
+                                        createAnswerActions(finalAnswerDiv, result.best_answer || '', savedQuestion);
                                         
                                         // 显示进度切换按钮
                                         processToggle.style.display = 'inline-block';
@@ -2475,8 +3646,17 @@
                 finalAnswerDiv.style.display = 'block';
                 appendProcessLine(t_catch.evaluationTerminated);
             } finally {
+                // 清理 currentReader
+                window.currentReader = null;
+                
+                // 恢复UI状态
                 questionInput.disabled = false;
                 questionInput.focus();
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('hidden');
+                if (stopBtn) {
+                    stopBtn.classList.add('hidden');
+                }
             }
         };
         
@@ -2860,27 +4040,32 @@
         
         function loadChatHistory() {
             try {
+                console.log('[历史记录] 开始加载历史记录...');
                 const historyContainer = document.getElementById('chat-history');
                 if (!historyContainer) {
-                    console.error('历史记录容器不存在');
+                    console.error('[历史记录] 历史记录容器不存在');
                     return;
                 }
                 
                 let allHistory = [];
                 try {
                     const historyStr = S.get('all_chat_history', '[]');
+                    console.log('[历史记录] localStorage中的历史记录字符串长度:', historyStr.length);
                     allHistory = JSON.parse(historyStr);
+                    console.log('[历史记录] 成功解析历史记录，数量:', allHistory.length);
                 } catch (e) {
-                    console.error('解析历史记录失败:', e);
+                    console.error('[历史记录] 解析历史记录失败:', e);
                     allHistory = [];
                 }
                 
                 if (!Array.isArray(allHistory) || allHistory.length === 0) {
+                    console.log('[历史记录] 没有历史记录或数据无效');
                     const t = i18n[window.currentLang || 'zh'] || i18n.zh;
                     historyContainer.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">${t.noHistory}</div>`;
                     return;
                 }
                 
+                console.log('[历史记录] 渲染', allHistory.length, '条历史记录');
                 const t = i18n[window.currentLang || 'zh'] || i18n.zh;
                 historyContainer.innerHTML = allHistory.map(item => {
                     const date = new Date(item.createdAt || Date.now());
@@ -2904,17 +4089,19 @@
                         const id = item.getAttribute('data-id');
                         const historyItem = allHistory.find(h => h.id === id);
                         if (historyItem && historyPopup) {
+                            console.log('[历史记录] 加载历史对话:', historyItem.title);
                             loadHistoryToChat(historyItem);
                             historyPopup.classList.add('hidden');
                         }
                     });
                 });
+                console.log('[历史记录] 历史记录渲染完成');
             } catch (e) {
-                console.error('加载历史记录失败:', e);
+                console.error('[历史记录] 加载历史记录失败:', e);
                 const t = i18n[window.currentLang || 'zh'] || i18n.zh;
                 const historyContainer = document.getElementById('chat-history');
                 if (historyContainer) {
-                    historyContainer.innerHTML = `<div class="text-sm text-red-400 text-center py-4">加载失败</div>`;
+                    historyContainer.innerHTML = `<div class="text-sm text-red-400 text-center py-4">加载失败: ${e.message}</div>`;
                 }
             }
         }
@@ -3005,394 +4192,7 @@
             settingsModal.classList.add('active');
             document.querySelector('.settings-nav-item[data-section="prompts"]').click();
         };
-        
-        // ==================== 壁纸功能 ====================
-        const wallpaperStatus = document.getElementById('wallpaper-status');
-        function setWallpaperStatus(message, isError = false) {
-            if (!wallpaperStatus) return;
-            wallpaperStatus.textContent = message || '';
-            wallpaperStatus.style.color = isError ? '#f87171' : '#9ca3af';
-        }
 
-        // 应用背景图片
-        function applyBgImage() {
-            const bgImage = S.get('bgImage');
-            const opacity = S.get('bgOpacity', '100');
-            const brightness = S.get('bgBrightness', '100');
-            // 强制确保模糊值为0，如果用户之前设置过非0值，也重置为0
-            let blur = parseInt(S.get('bgBlur', '0')) || 0;
-            if (blur > 0) {
-                // 如果发现有模糊值，重置为0并保存
-                blur = 0;
-                S.set('bgBlur', '0');
-                // 更新滑块显示
-                const blurSlider = document.getElementById('wallpaper-blur');
-                const blurLabel = document.getElementById('wallpaper-blur-label');
-                if (blurSlider) blurSlider.value = 0;
-                if (blurLabel) blurLabel.textContent = '0px';
-            }
-            
-            // 更新 CSS 样式 - 移除所有可能冲突的样式（包括script.js添加的）
-            const styleIds = ['bg-filter-style', 'wallpaper-style'];
-            styleIds.forEach(id => {
-                const existingStyle = document.getElementById(id);
-                if (existingStyle) {
-                    existingStyle.remove();
-                    console.log(`[壁纸] 已移除旧样式: ${id}`);
-                }
-            });
-            
-            const style = document.createElement('style');
-            style.id = 'bg-filter-style';
-            
-            if (bgImage) {
-                // 根据当前主题计算叠加层颜色
-                // 降低叠加层透明度，让壁纸更清晰（当透明度为100%时，叠加层完全透明）
-                const isDark = document.documentElement.classList.contains('dark');
-                const baseOverlayColor = isDark ? '26,29,35' : '247,250,252';
-                // 确保透明度为100%时叠加层完全透明，降低叠加层影响
-                const overlayOpacity = opacity >= 100 ? 0 : Math.max(0, (1 - (opacity / 100)) * 0.3);
-                const overlayColor = `rgba(${baseOverlayColor},${overlayOpacity})`;
-                
-                // 添加has-wallpaper类到html和body，使背景透明
-                document.documentElement.classList.add('has-wallpaper');
-                document.body.classList.add('has-wallpaper');
-                
-                // 将背景图片设置在 body::before 上，并应用滤镜
-                // 使用转义来安全处理base64数据
-                const safeBgImage = bgImage.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-                
-                style.textContent = `
-                    body.has-wallpaper::before {
-                        content: '' !important;
-                        position: fixed !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        right: 0 !important;
-                        bottom: 0 !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        background-image: url('${safeBgImage}') !important;
-                        background-size: cover !important;
-                        background-position: center center !important;
-                        background-attachment: fixed !important;
-                        background-repeat: no-repeat !important;
-                        filter: brightness(${brightness}%) !important;
-                        opacity: 1 !important;
-                        display: block !important;
-                        visibility: visible !important;
-                        z-index: -2 !important;
-                        pointer-events: none !important;
-                    }
-                    html.has-wallpaper,
-                    body.has-wallpaper {
-                        background: transparent !important;
-                        background-image: none !important;
-                    }
-                    body.has-wallpaper::after {
-                        content: '' !important;
-                        position: fixed !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        right: 0 !important;
-                        bottom: 0 !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        background: ${overlayColor} !important;
-                        z-index: -1 !important;
-                        pointer-events: none !important;
-                        display: block !important;
-                    }
-                    
-                    /* 确保侧边栏和主内容区在有壁纸时保持适度不透明以确保文字清晰 */
-                    body.has-wallpaper .sidebar {
-                        background: rgba(37, 41, 50, 0.85) !important;
-                        backdrop-filter: blur(10px) !important;
-                    }
-                    
-                    body.has-wallpaper .main-content {
-                        background: rgba(26, 29, 35, 0.85) !important;
-                        backdrop-filter: blur(10px) !important;
-                    }
-                    
-                    html:not(.dark) body.has-wallpaper .sidebar {
-                        background: rgba(237, 242, 247, 0.92) !important;
-                    }
-                    
-                    html:not(.dark) body.has-wallpaper .main-content {
-                        background: rgba(247, 250, 252, 0.92) !important;
-                    }
-                    
-                    /* 有壁纸时，输入区域也使用适度不透明以确保文字清晰 */
-                    body.has-wallpaper .input-area {
-                        background: rgba(37, 41, 50, 0.85) !important;
-                        backdrop-filter: blur(10px) !important;
-                        border-top: 1px solid rgba(74, 85, 104, 0.5) !important;
-                    }
-                    
-                    body.has-wallpaper .input-container {
-                        background: rgba(50, 58, 70, 0.9) !important;
-                        backdrop-filter: blur(5px) !important;
-                        border: 1px solid rgba(58, 69, 83, 0.6) !important;
-                    }
-                    
-                    html:not(.dark) body.has-wallpaper .input-area {
-                        background: rgba(237, 242, 247, 0.92) !important;
-                        border-top: 1px solid rgba(203, 213, 224, 0.5) !important;
-                    }
-                    
-                    html:not(.dark) body.has-wallpaper .input-container {
-                        background: rgba(255, 255, 255, 0.95) !important;
-                        border: 1px solid rgba(226, 232, 240, 0.6) !important;
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                // 强制重新渲染和验证
-                requestAnimationFrame(() => {
-                    // 触发重排以确保样式应用
-                    void document.body.offsetHeight;
-                    void document.documentElement.offsetHeight;
-                    
-                    // 延迟检查，确保样式完全应用
-                    setTimeout(() => {
-                        const testStyle = window.getComputedStyle(document.body, '::before');
-                        const bgImgValue = testStyle.backgroundImage;
-                        const opacityValue = testStyle.opacity;
-                        const displayValue = testStyle.display;
-                        const zIndexValue = testStyle.zIndex;
-                        
-                        console.log('[壁纸] 应用完成，长度:', bgImage.length);
-                        console.log('[壁纸] computed background-image:', bgImgValue ? bgImgValue.substring(0, 100) : 'none');
-                        console.log('[壁纸] computed opacity:', opacityValue);
-                        console.log('[壁纸] computed display:', displayValue);
-                        console.log('[壁纸] computed z-index:', zIndexValue);
-                        console.log('[壁纸] html.has-wallpaper:', document.documentElement.classList.contains('has-wallpaper'));
-                        console.log('[壁纸] body.has-wallpaper:', document.body.classList.contains('has-wallpaper'));
-                        console.log('[壁纸] 叠加层颜色:', overlayColor);
-                        console.log('[壁纸] 亮度:', brightness + '%, 模糊:', blur + 'px');
-                        
-                        if (bgImgValue && bgImgValue !== 'none' && bgImgValue.includes('url')) {
-                            console.log('✓ 背景图片已成功应用到 body::before');
-                            
-                            // 验证侧边栏和主内容区的透明度
-                            const sidebarEl = document.querySelector('.sidebar');
-                            const mainContentEl = document.querySelector('.main-content');
-                            if (sidebarEl) {
-                                const sidebarStyle = window.getComputedStyle(sidebarEl);
-                                console.log('[壁纸] 侧边栏背景:', sidebarStyle.background);
-                            }
-                            if (mainContentEl) {
-                                const mainStyle = window.getComputedStyle(mainContentEl);
-                                console.log('[壁纸] 主内容区背景:', mainStyle.background);
-                            }
-                        } else {
-                            console.error('❌ 背景图片未正确应用！computed:', bgImgValue);
-                            console.error('[壁纸] 请检查CSS选择器是否正确匹配');
-                            
-                            // 尝试强制刷新
-                            document.body.style.display = 'none';
-                            void document.body.offsetHeight;
-                            document.body.style.display = '';
-                        }
-                    }, 100);
-                });
-            } else {
-                // 清除背景图片
-                document.documentElement.classList.remove('has-wallpaper');
-                document.body.classList.remove('has-wallpaper');
-                
-                style.textContent = `
-                    body::before {
-                        background-image: none !important;
-                        filter: none !important;
-                    }
-                    body::after {
-                        background: transparent !important;
-                    }
-                `;
-                document.head.appendChild(style);
-                console.log('[壁纸] 壁纸已清除');
-            }
-            
-            // 确保我们的函数覆盖script.js中的函数（如果存在）
-            if (typeof window !== 'undefined') {
-                window.applyBgImage = applyBgImage;
-            }
-        }
-        
-        // 上传壁纸 - 使用更安全的事件绑定方式，确保不被script.js覆盖
-        function setupWallpaperUpload() {
-            const uploadBtn = document.getElementById('wallpaper-upload-btn');
-            const uploadInput = document.getElementById('wallpaper-upload');
-            
-            if (!uploadBtn || !uploadInput) {
-                console.warn('壁纸上传元素不存在，延迟重试...');
-                setTimeout(setupWallpaperUpload, 500);
-                return;
-            }
-            
-            // 先移除所有旧的事件监听器（包括script.js添加的）
-            uploadBtn.onclick = null;
-            uploadInput.onchange = null;
-            
-            // 使用 addEventListener 并设置高优先级
-            uploadBtn.addEventListener('click', function handleUploadClick(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                console.log('[壁纸] 点击上传按钮');
-                uploadInput.click();
-            }, true); // 使用捕获阶段，优先级更高
-            
-            uploadInput.addEventListener('change', function handleUploadChange(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                
-                const file = e.target.files[0];
-                if (!file) {
-                    console.log('[壁纸] 未选择文件');
-                    return;
-                }
-
-                console.log('[壁纸] 选择的文件:', file.name, '大小:', file.size, '类型:', file.type);
-
-                const t_wall = i18n[window.currentLang || 'zh'] || i18n.zh;
-                if (file.size > 4 * 1024 * 1024) {
-                    setWallpaperStatus(t_wall.wallpaperSizeError, true);
-                    e.target.value = '';
-                    return;
-                }
-
-                if (!file.type.startsWith('image/')) {
-                    setWallpaperStatus('请选择图片文件', true);
-                    e.target.value = '';
-                    return;
-                }
-
-                setWallpaperStatus(t_wall.uploadingWallpaper);
-                
-                const reader = new FileReader();
-                reader.onerror = (err) => {
-                    console.error('[壁纸] 文件读取错误:', err);
-                    const t_wall_err = i18n[window.currentLang || 'zh'] || i18n.zh;
-                    setWallpaperStatus(t_wall_err.wallpaperFileError, true);
-                };
-                reader.onload = (ev) => {
-                    try {
-                        const imageData = ev.target.result;
-                        console.log('[壁纸] 图片数据已读取，长度:', imageData.length);
-                        
-                        // 验证是否是有效的base64图片数据
-                        if (!imageData || !imageData.startsWith('data:image/')) {
-                            throw new Error('无效的图片格式');
-                        }
-                        
-                        S.set('bgImage', imageData);
-                        console.log('[壁纸] 图片已保存到localStorage，键: bgImage');
-                        
-                        // 立即应用背景
-                        applyBgImage();
-                        
-                        // 再次应用以确保生效（延迟确保DOM更新）
-                        setTimeout(() => {
-                            applyBgImage();
-                        }, 200);
-                        
-                        const t_wall_ok = i18n[window.currentLang || 'zh'] || i18n.zh;
-                        setWallpaperStatus(t_wall_ok.wallpaperUpdated);
-                        console.log('[壁纸] 壁纸应用完成');
-                    } catch (err) {
-                        console.error('[壁纸] 保存壁纸失败', err);
-                        const t_wall_err2 = i18n[window.currentLang || 'zh'] || i18n.zh;
-                        setWallpaperStatus(t_wall_err2.wallpaperError + ': ' + err.message, true);
-                    }
-                };
-                reader.readAsDataURL(file);
-            }, true); // 使用捕获阶段，优先级更高
-            
-            console.log('[壁纸] 壁纸上传事件已绑定（高优先级）');
-        }
-        
-        // 延迟设置，确保在script.js之后执行
-        function initWallpaperUpload() {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => {
-                    setTimeout(setupWallpaperUpload, 1000); // 延迟1秒，确保script.js先执行完
-                });
-            } else {
-                setTimeout(setupWallpaperUpload, 1000); // 延迟1秒
-            }
-        }
-        initWallpaperUpload();
-        
-        // 重置壁纸
-        document.getElementById('reset-wallpaper-btn').onclick = () => {
-            const t_wall_reset = i18n[window.currentLang || 'zh'] || i18n.zh;
-            if (confirm(t_wall_reset.confirmResetWallpaper)) {
-                S.set('bgImage', '');
-                S.set('bgOpacity', '100');
-                S.set('bgBrightness', '100');
-                S.set('bgBlur', '0');
-                document.getElementById('wallpaper-opacity').value = 100;
-                document.getElementById('wallpaper-brightness').value = 100;
-                document.getElementById('wallpaper-blur').value = 0;
-                document.getElementById('wallpaper-opacity-label').textContent = '100%';
-                document.getElementById('wallpaper-brightness-label').textContent = '100%';
-                document.getElementById('wallpaper-blur-label').textContent = '0px';
-                applyBgImage();
-                setWallpaperStatus(t_wall_reset.wallpaperReset);
-            }
-        };
-        
-        // 透明度滑块
-        const opacitySlider = document.getElementById('wallpaper-opacity');
-        const opacityLabel = document.getElementById('wallpaper-opacity-label');
-        opacitySlider.value = S.get('bgOpacity', '100');
-        opacityLabel.textContent = opacitySlider.value + '%';
-        
-        opacitySlider.oninput = (e) => {
-            const value = e.target.value;
-            opacityLabel.textContent = value + '%';
-            S.set('bgOpacity', value);
-            applyBgImage();
-        };
-        
-        // 亮度滑块
-        const brightnessSlider = document.getElementById('wallpaper-brightness');
-        const brightnessLabel = document.getElementById('wallpaper-brightness-label');
-        brightnessSlider.value = S.get('bgBrightness', '100');
-        brightnessLabel.textContent = brightnessSlider.value + '%';
-        
-        brightnessSlider.oninput = (e) => {
-            const value = e.target.value;
-            brightnessLabel.textContent = value + '%';
-            S.set('bgBrightness', value);
-            applyBgImage();
-        };
-        
-        // 模糊滑块
-        const blurSlider = document.getElementById('wallpaper-blur');
-        const blurLabel = document.getElementById('wallpaper-blur-label');
-        blurSlider.value = S.get('bgBlur', '0');
-        blurLabel.textContent = blurSlider.value + 'px';
-        
-        blurSlider.oninput = (e) => {
-            const value = e.target.value;
-            blurLabel.textContent = value + 'px';
-            S.set('bgBlur', value);
-            applyBgImage();
-        };
-        
-        // 初始化壁纸 - 延迟执行确保在script.js之后
-        setTimeout(() => {
-            applyBgImage();
-            const t_wall_init = i18n[window.currentLang || 'zh'] || i18n.zh;
-            setWallpaperStatus(S.get('bgImage') ? t_wall_init.wallpaperSaved : t_wall_init.wallpaperDefault);
-        }, 1500);
-        // ==================== 壁纸功能结束 ====================
-        
         // 初始化加载
         loadProviders();
         loadPrompts();
