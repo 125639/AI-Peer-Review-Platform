@@ -26,6 +26,7 @@ class QueryRequest(BaseModel):
     selected_models: List[str]
     history: Optional[List[ChatMessage]] = []
     ocr_text: Optional[str] = None
+    enable_search: Optional[bool] = False
 
 class ProviderModel(BaseModel):
     name: str = Field(..., min_length=1)
@@ -47,14 +48,14 @@ router = APIRouter()
 def health_check():
     return {"status": "ok"}
 
-def get_available_tools():
+def get_available_tools(enable_network: bool = False):
     """获取可用的工具列表"""
     from core.config import get_config
     config = get_config()
     tools = []
     
-    # 如果 SearXNG 已启用，添加搜索工具
-    if config.searxng.enabled:
+    # 如果 SearXNG 已启用并且用户开启网络搜索，添加搜索工具
+    if enable_network and config.searxng.enabled:
         tools.append({
             "type": "function",
             "function": {
@@ -79,8 +80,8 @@ async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str,
     try:
         orch = Orchestrator()
         history_dicts = [msg.model_dump() for msg in request.history] if request.history else []
-        # 获取可用工具
-        tools = get_available_tools()
+        # 根据用户设置获取可用工具
+        tools = get_available_tools(enable_network=request.enable_search or False)
         async for event in orch.process_query_stream(
             request.question, 
             request.selected_models, 

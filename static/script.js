@@ -242,6 +242,9 @@ const i18nDict = {
         bulk_ocr_clear: "清空结果",
         bulk_ocr_tip: "将使用已配置的第一个模型，对多张图片批量识别并汇总到下方文本框。",
         bulk_ocr_placeholder: "批量OCR结果会出现在这里……",
+        network_toggle_on: "网络搜索：开启",
+        network_toggle_off: "网络搜索：关闭",
+        network_toggle_disabled: "SearXNG 未启用，无法使用网络搜索",
         // ...更多如有
     },
     en: {
@@ -309,6 +312,9 @@ const i18nDict = {
         bulk_ocr_clear: "Clear",
         bulk_ocr_tip: "Use the first configured model to recognize multiple images, and append results here.",
         bulk_ocr_placeholder: "Batch OCR results will appear here...",
+        network_toggle_on: "Web search: enabled",
+        network_toggle_off: "Web search: disabled",
+        network_toggle_disabled: "SearXNG is disabled, web search is unavailable",
         // ...more as needed
     }
 };
@@ -396,6 +402,10 @@ function setLang(lang) {
     });
     // 其它如label等
     // ...可以继续完善
+
+    if (typeof window.updateSearchToggleButton === 'function') {
+        window.updateSearchToggleButton();
+    }
 }
 
 // ===== 设置页面语言切换事件监听 =====
@@ -414,6 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentReader = null;
     let isGenerating = false;
     let pendingOcrText = null;
+    let searchEnabled = false; // 网络搜索功能开关（默认关闭）
     
     // === DOM元素引用（带错误检查）===
     const addProviderForm = document.getElementById('add-provider-form');
@@ -426,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitIcon = document.getElementById('submit-icon');
     const chatLog = document.getElementById('chat-log');
     const newChatBtn = document.getElementById('new-chat-btn');
+    const toggleSearchBtn = document.getElementById('toggle-search-btn');
     const detailsModal = document.getElementById('details-modal');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const processDetailsContainer = document.getElementById('process-details-container');
@@ -1365,9 +1377,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 question: question,
                 selected_models: modelsToUse,
                 history: conversationHistory.slice(0, -1),
-                ocr_text: pendingOcrText || null
+                ocr_text: pendingOcrText || null,
+                enable_search: searchEnabled
             };
             console.log('[processQuery] 完整请求体:', JSON.stringify(requestBody, null, 2));
+            console.log('[processQuery] 网络搜索状态: ' + (searchEnabled ? '开启' : '关闭'));
             
             const response = await fetch(`${API_BASE_URL}/api/process`, {
                 method: 'POST',
@@ -1845,6 +1859,60 @@ document.addEventListener('DOMContentLoaded', () => {
             log.info('New chat started');
         }
     });
+    
+    // 网络搜索按钮切换
+    function updateSearchToggleButton() {
+        if (!toggleSearchBtn) return;
+        if (toggleSearchBtn.disabled) {
+            toggleSearchBtn.classList.remove('active');
+            toggleSearchBtn.title = getI18n('network_toggle_disabled');
+            return;
+        }
+        toggleSearchBtn.classList.toggle('active', searchEnabled);
+        toggleSearchBtn.title = getI18n(searchEnabled ? 'network_toggle_on' : 'network_toggle_off');
+    }
+    window.updateSearchToggleButton = updateSearchToggleButton;
+    
+    async function ensureSearchAvailability() {
+        if (!toggleSearchBtn) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/config/searxng`);
+            if (!response.ok) return;
+            const config = await response.json();
+            if (!config.enabled) {
+                searchEnabled = false;
+                toggleSearchBtn.disabled = true;
+                toggleSearchBtn.style.opacity = '0.5';
+                toggleSearchBtn.style.cursor = 'not-allowed';
+                toggleSearchBtn.classList.remove('active');
+                toggleSearchBtn.title = getI18n('network_toggle_disabled');
+                localStorage.setItem('search_enabled', 'false');
+            }
+        } catch (error) {
+            log.warn(`Failed to load SearXNG config: ${error}`);
+        } finally {
+            updateSearchToggleButton();
+        }
+    }
+    
+    if (toggleSearchBtn) {
+        // 从localStorage恢复之前的状态
+        const savedSearchState = localStorage.getItem('search_enabled');
+        if (savedSearchState === 'true') {
+            searchEnabled = true;
+        }
+        updateSearchToggleButton();
+        ensureSearchAvailability();
+        
+        toggleSearchBtn.addEventListener('click', () => {
+            if (toggleSearchBtn.disabled) return;
+            searchEnabled = !searchEnabled;
+            localStorage.setItem('search_enabled', searchEnabled ? 'true' : 'false');
+            updateSearchToggleButton();
+            notification.info(getI18n(searchEnabled ? 'network_toggle_on' : 'network_toggle_off'));
+            log.info(`Search state toggled: ${searchEnabled}`);
+        });
+    }
     
     closeModalBtn.addEventListener('click', () => {
         detailsModal.classList.remove('active');
