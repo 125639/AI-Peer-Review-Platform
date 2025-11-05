@@ -1,19 +1,14 @@
-2025-11-05 15:11:16 [INFO] __main__: Starting server on 0.0.0.0:8000
-INFO:     Started server process [5526]
+2025-11-05 15:35:55 [INFO] __main__: Starting server on 0.0.0.0:8000
+INFO:     Started server process [14312]
 INFO:     Waiting for application startup.
-2025-11-05 15:11:16 [INFO] main: Starting AI Peer Review Platform v2.0...
-2025-11-05 15:11:16 [INFO] main: Database initialized
+2025-11-05 15:35:55 [INFO] main: Starting AI Peer Review Platform v2.0...
+2025-11-05 15:35:55 [INFO] main: Database initialized
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:58000 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:44008 - "GET /static/wallpaper.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:44014 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52148 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:33532 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35910 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58128 - "GET /static/wallpaper.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42544 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53552 - "GET /api/config/searxng HTTP/1.1" 200 OK
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
-2025-11-05 15:12:28 [INFO] main: Shutting down AI Peer Review Platform...
+2025-11-05 15:36:15 [INFO] main: Shutting down AI Peer Review Platform...
 INFO:     Application shutdown complete.
-INFO:     Finished server process [5526]
+INFO:     Finished server process [14312]
