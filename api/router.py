@@ -30,6 +30,13 @@ class ProviderModel(BaseModel):
     models: str = Field(..., min_length=1)
     api_base: Optional[str] = None
 
+class ProviderUpdateModel(BaseModel):
+    name: str = Field(..., min_length=1)
+    type: str = Field(..., pattern="^(OpenAI|Gemini)$")
+    api_key: Optional[str] = None
+    models: str = Field(..., min_length=1)
+    api_base: Optional[str] = None
+
 router = APIRouter()
 
 @router.get("/health")
@@ -74,15 +81,21 @@ def remove_provider(name: str):
     return {"message": "删除成功"}
 
 @router.put("/providers/{name}")
-def update_provider_by_name(name: str, data: ProviderModel):
+def update_provider_by_name(name: str, data: ProviderUpdateModel):
     if data.name != name:
         raise HTTPException(400, "不允许修改名称")
     if data.type == 'OpenAI' and not data.api_base:
         raise HTTPException(422, "OpenAI类型需提供api_base")
     
-    update_data = data.model_dump(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True, exclude_none=True)
+    
+    # 如果api_key为空字符串或包含占位符，则从更新数据中移除，保留原有值
     if 'api_key' in update_data and (not update_data['api_key'] or '...' in update_data['api_key'] or update_data['api_key'] == '********'):
         del update_data['api_key']
+    
+    # 对于Gemini类型，如果没有提供api_base，则设为None
+    if data.type == 'Gemini' and 'api_base' not in update_data:
+        update_data['api_base'] = None
     
     if not db.update_provider(name, update_data):
         raise HTTPException(404, "更新失败")
@@ -139,27 +152,43 @@ async def ocr_image(
     file: UploadFile = File(...),
     ocr_model: str = Form(...)
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"=== [/api/ocr] OCR请求开始 ===")
+    logger.info(f"[/api/ocr] 文件名: {file.filename}")
+    logger.info(f"[/api/ocr] Content-Type: {file.content_type}")
+    logger.info(f"[/api/ocr] OCR模型: {ocr_model}")
+    
     # 解析模型标识: provider::model
     try:
         provider_name, model_name = ocr_model.split("::", 1)
     except ValueError:
+        logger.error(f"[/api/ocr] 模型格式错误: {ocr_model}")
         raise HTTPException(400, "ocr_model 格式应为 '服务商名::模型名'")
 
     provider_config = db.get_provider_by_name(provider_name)
     if not provider_config:
+        logger.error(f"[/api/ocr] 未找到服务商: {provider_name}")
         raise HTTPException(404, f"未找到服务商: {provider_name}")
 
     # 读取图片字节与 MIME 类型
     image_bytes = await file.read()
     mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+    
+    logger.info(f"[/api/ocr] 图片字节数: {len(image_bytes)}")
+    logger.info(f"[/api/ocr] MIME类型: {mime_type}")
 
     if not image_bytes:
+        logger.error(f"[/api/ocr] 未读取到图片内容")
         raise HTTPException(400, "未读取到图片内容")
 
     provider_type = provider_config.get('type')
+    logger.info(f"[/api/ocr] 服务商类型: {provider_type}")
 
     try:
         if provider_type == 'OpenAI':
+            logger.info(f"[/api/ocr] 使用OpenAI Vision API")
             # 使用 OpenAI Chat Completions 的 vision 能力
             client = openai.AsyncOpenAI(
                 api_key=provider_config['api_key'],
@@ -168,6 +197,7 @@ async def ocr_image(
             b64 = base64.b64encode(image_bytes).decode('utf-8')
             image_url = f"data:{mime_type};base64,{b64}"
             prompt_text = "请识别图片中的文字内容，尽量保持原有段落与换行。只输出识别到的文本。"
+            logger.info(f"[/api/ocr] 发送OpenAI API请求...")
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -182,7 +212,11 @@ async def ocr_image(
                 temperature=0
             )
             text = response.choices[0].message.content or ""
+            logger.info(f"[/api/ocr] OpenAI返回OCR文本，长度: {len(text)}")
+            logger.info(f"[/api/ocr] OCR文本内容: {text[:200]}...")
+
         elif provider_type == 'Gemini':
+            logger.info(f"[/api/ocr] 使用Gemini多模态API")
             # 使用 Gemini 多模态能力进行OCR
             genai.configure(api_key=provider_config['api_key'])
             model = genai.GenerativeModel(model_name)
@@ -191,15 +225,23 @@ async def ocr_image(
                 prompt_text,
                 {"mime_type": mime_type, "data": image_bytes}
             ]
+            logger.info(f"[/api/ocr] 发送Gemini API请求...")
             resp = await asyncio.to_thread(model.generate_content, parts)
             text = getattr(resp, 'text', '') or ''
+            logger.info(f"[/api/ocr] Gemini返回OCR文本，长度: {len(text)}")
+            logger.info(f"[/api/ocr] OCR文本内容: {text[:200]}...")
         else:
+            logger.error(f"[/api/ocr] 不支持的服务商类型: {provider_type}")
             raise HTTPException(400, f"不支持的服务商类型: {provider_type}")
 
         if not text:
+            logger.warn(f"[/api/ocr] OCR返回空文本")
             text = ""
+        
+        logger.info(f"[/api/ocr] 返回结果: ocr_text长度={len(text)}")
         return JSONResponse({"ocr_text": text})
     except Exception as e:
+        logger.error(f"[/api/ocr] OCR识别失败: {e}", exc_info=True)
         raise HTTPException(500, f"OCR 识别失败: {e}")
 
 

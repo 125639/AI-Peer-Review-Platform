@@ -1,513 +1,3401 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI工厂 v14.0 - OCR增强版</title>
-    <!-- 启用 Tailwind 暗色模式的 class 策略，并在最早阶段应用保存的主题，避免闪烁 -->
-    <script>
-        // 1) 告诉 Tailwind 使用 class 策略切换暗色
-        window.tailwind = window.tailwind || {};
-        tailwind.config = { darkMode: 'class' };
-        // 2) 尽早设置 html 的 dark 类，减少首屏闪烁
-        (() => {
-            try {
-                const theme = localStorage.getItem('theme') || 'dark';
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                    document.addEventListener('DOMContentLoaded', () => {
-                        if (document.body) {
-                            document.body.classList.add('dark');
-                        }
-                    });
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    document.addEventListener('DOMContentLoaded', () => {
-                        if (document.body) {
-                            document.body.classList.remove('dark');
-                        }
-                    });
-                }
-            } catch (e) {
-                // 本地存储不可用时默认为暗色
-                document.documentElement.classList.add('dark');
-                document.addEventListener('DOMContentLoaded', () => {
-                    if (document.body) {
-                        document.body.classList.add('dark');
-                    }
-                });
-            }
-        })();
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .form-input {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: #E2E8F0;
-            border: 1px solid #CBD5E0;
-            border-radius: 0.375rem;
-            color: #1A202C;
+        /* 现代深色主题样式 - 仿照参考图界面 */
+        :root {
+            --bg-primary: #1a1d23;
+            --bg-secondary: #252932;
+            --bg-tertiary: #2d3748;
+            --bg-card: #323a46;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            --accent-blue: #4299e1;
+            --accent-purple: #805ad5;
+            --border-color: #4a5568;
+            --border-light: #3a4553;
         }
-        .dark .form-input {
-            background-color: #2D3748;
-            border-color: #4A5568;
-            color: #E2E8F0;
+        
+        /* 浅色主题样式 */
+        html:not(.dark) {
+            --bg-primary: #f7fafc;
+            --bg-secondary: #edf2f7;
+            --bg-tertiary: #e2e8f0;
+            --bg-card: #ffffff;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --accent-blue: #3182ce;
+            --accent-purple: #6b46c1;
+            --border-color: #cbd5e0;
+            --border-light: #e2e8f0;
         }
-        .form-input::placeholder {
-            color: #A0AEC0;
+        
+        body {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            position: relative;
         }
-        .dark .form-input::placeholder {
-            color: #718096;
+        
+        /* 当有壁纸时，body、html、侧边栏和主内容区背景应该透明以显示壁纸 */
+        html.has-wallpaper,
+        body.has-wallpaper {
+            background: transparent !important;
+            background-image: none !important;
         }
-        .form-input:focus {
-            outline: 0;
-            border-color: #6366F1;
-            box-shadow: 0 0 0 2px rgba(99,102,241,0.35);
+        
+        /* 有壁纸时，让侧边栏和主内容区保持适度不透明以确保文字清晰 */
+        body.has-wallpaper .sidebar {
+            background: rgba(37, 41, 50, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
         }
-        .provider-item .edit-provider-form {
-            display: none;
+        
+        body.has-wallpaper .main-content {
+            background: rgba(26, 29, 35, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
         }
-        .provider-item.open .edit-provider-form {
-            display: block;
+        
+        html:not(.dark) body.has-wallpaper .sidebar {
+            background: rgba(237, 242, 247, 0.92) !important;
         }
-        .provider-item.open .header-arrow {
-            transform: rotate(180deg);
+        
+        html:not(.dark) body.has-wallpaper .main-content {
+            background: rgba(247, 250, 252, 0.92) !important;
         }
-        .chat-bubble {
-            max-width: 90%;
-            padding: 0.75rem 1rem;
-            border-radius: 1rem;
-            line-height: 1.6;
-            word-wrap: break-word;
+        
+        /* 有壁纸时，输入区域也使用适度不透明以确保文字清晰 */
+        body.has-wallpaper .input-area {
+            background: rgba(37, 41, 50, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
+            border-top: 1px solid rgba(74, 85, 104, 0.5) !important;
         }
-        .user-bubble {
-            background-color: #4A51C8;
-            color: #fff;
-            border-bottom-right-radius: 0.25rem;
-            align-self: flex-end;
+        
+        body.has-wallpaper .input-container {
+            background: rgba(50, 58, 70, 0.9) !important;
+            backdrop-filter: blur(5px) !important;
+            border: 1px solid rgba(58, 69, 83, 0.6) !important;
         }
-        .assistant-bubble {
-            background-color: #FFFFFF;
-            color: #1A202C;
-            border: 1px solid #E2E8F0;
-            border-bottom-left-radius: 0.25rem;
-            align-self: flex-start;
+        
+        html:not(.dark) body.has-wallpaper .input-area {
+            background: rgba(237, 242, 247, 0.92) !important;
+            border-top: 1px solid rgba(203, 213, 224, 0.5) !important;
         }
-        .dark .assistant-bubble {
-            background-color: #2D3748;
-            color: #E2E8F0;
-            border: none;
+        
+        html:not(.dark) body.has-wallpaper .input-container {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid rgba(226, 232, 240, 0.6) !important;
         }
-        .turn-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .assistant-response-container {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .action-buttons {
-            margin-top: 0.5rem;
-            margin-left: 0.5rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-        .action-btn {
-            background-color: #E2E8F0;
-            color: #2D3748;
-            padding: 0.25rem 0.75rem;
-            border: none;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .dark .action-btn {
-            background-color: #4A5568;
-            color: #E2E8F0;
-        }
-        .action-btn:hover {
-            background-color: #6366F1;
-            color: #fff;
-        }
-        .modal-overlay {
+        
+        body::before {
+            content: '';
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0,0,0,0.7);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background-color: #FFFFFF;
-            color: #1A202C;
-            padding: 2rem;
-            border-radius: 0.5rem;
-            width: 90%;
-            max-width: 70rem;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .dark .modal-content {
-            background-color: #1A202C;
-            color: #E2E8F0;
-        }
-        .modal-overlay.active {
-            display: flex;
-        }
-        .collapsible-header {
-            cursor: pointer;
-        }
-        .collapsible-content {
-            display: none;
-        }
-        .collapse-wrapper.open .collapsible-content {
-            display: block;
-        }
-        .tab-btn {
-            color: #6B7280;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        .dark .tab-btn {
-            color: #9CA3AF;
-        }
-        .tab-btn:hover {
-            color: #4F46E5;
-        }
-        .dark .tab-btn:hover {
-            color: #A5B4FC;
-        }
-        .tab-btn.active {
-            color: #6366F1;
-            border-bottom-color: #6366F1;
-        }
-        .tab-content {
-            display: none !important;
-        }
-        .tab-content.active {
-            display: flex !important;
-        }
-        .prompt-item {
-            background-color: #F3F4F6;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            border: 2px solid #E5E7EB;
-        }
-        .dark .prompt-item {
-            background-color: #2D3748;
-            border-color: #4A5568;
-        }
-        .prompt-item.active {
-            border-color: #6366F1;
-            background-color: #EEF2FF;
-        }
-        .dark .prompt-item.active {
-            background-color: #374151;
-        }
-        .dimension-score {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-right: 0.5rem;
-        }
-        .score-0 { background-color: #7F1D1D; color: #FEE2E2; }
-        .score-1 { background-color: #991B1B; color: #FECACA; }
-        .score-2 { background-color: #92400E; color: #FED7AA; }
-        .score-3 { background-color: #15803D; color: #BBF7D0; }
-        #sidebar.collapsed {
-            width: 0 !important;
-            max-width: 0 !important;
-            padding: 0 !important;
-            opacity: 0;
+            background-image: none;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            filter: none;
+            z-index: -2;
             pointer-events: none;
         }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { 
+            background: var(--text-muted); 
+            border-radius: 3px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+        
+        /* 侧边栏样式 */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            height: 100vh;
+            overflow-y: auto;
+            transition: width 0.3s ease, min-width 0.3s ease;
+            position: relative;
+        }
+        
+        .sidebar.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            overflow: hidden;
+        }
+        
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sidebar-toggle:hover {
+            background: var(--accent-blue);
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        /* 主内容区域 */
+        .main-content {
+            background: var(--bg-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 聊天区域 */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        /* 标签页样式 */
+        .tab-container {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+        }
+        
+        .tab-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .tab-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 2px 4px rgba(66, 153, 225, 0.3);
+        }
+        
+        .tab-btn:hover:not(.active) {
+            background: rgba(66, 153, 225, 0.1);
+            color: var(--text-primary);
+        }
+        
+        /* 卡片面板样式 */
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        /* 表单样式 */
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+        
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        /* 按钮样式 */
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+        }
+        
+        .btn-success {
+            background: #38a169;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-success:hover {
+            background: #2f855a;
+        }
+        
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-danger:hover {
+            background: #c53030;
+        }
+        
+        /* 服务商项目样式 */
         .provider-item {
-            background-color: rgba(226,232,240,0.7);
-            border: 1px solid #CBD5E0;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
         }
-        .dark .provider-item {
-            background-color: rgba(55,65,81,0.5);
-            border-color: #4A5568;
+        
+        .provider-item:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 2px 8px rgba(66, 153, 225, 0.2);
         }
-        #sidebar-toggle {
-            transition: left 0.3s ease, transform 0.3s ease;
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-        /* ========== 亮色主题视觉增强 ========== */
-        body:not(.dark) main {
-            background:
-                radial-gradient(1000px 600px at 85% -10%, rgba(99,102,241,0.15), rgba(99,102,241,0) 60%),
-                radial-gradient(700px 500px at -10% 30%, rgba(34,197,94,0.10), rgba(34,197,94,0) 60%),
-                #F3F4F6; /* 作为兜底背景色 */
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
         }
-        body:not(.dark) #sidebar {
-            background-color: #FFFFFF;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.04);
-            border-right: 1px solid #E5E7EB;
+
+        .evaluation-process {
+            background: rgba(37, 41, 50, 0.6);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
         }
-        body:not(.dark) .provider-item {
-            background-color: #FFFFFF;
-            border-color: #E5E7EB;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+
+        /* 简要模式：只显示简洁的行 */
+        .evaluation-process.simple {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
-        body:not(.dark) .prompt-item {
-            background-color: #FFFFFF;
-            border-color: #E5E7EB;
-            transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
+
+        .evaluation-process.simple .process-line {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+            padding: 4px 0;
         }
-        /* 激活的提示词卡片：淡紫底 + 蓝色描边（与参考图一致） */
-        body:not(.dark) .prompt-item.active {
-            background-color: #EDE9FE; /* violet-100 */
-            border-color: #3B82F6;     /* blue-500 */
-            box-shadow: 0 1px 2px rgba(59,130,246,0.15);
+
+        .evaluation-process.simple .process-block {
+            display: none !important; /* 简要模式下隐藏详细块 */
         }
-        /* 提示词详情内的代码/文本块在亮色下使用白底与浅灰描边，更清爽 */
-        body:not(.dark) .prompt-item pre {
-            background-color: #FFFFFF !important;
-            color: #111827 !important; /* gray-900 */
-            border: 1px solid #E5E7EB;
+
+        /* 详细模式：显示完整的块状内容 */
+        .evaluation-process.detailed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
-        /* 细节：提示摘要文字在亮色下更清晰 */
-        body:not(.dark) .prompt-item details > summary {
-            color: #6B7280;
+
+        .evaluation-process.detailed .process-line {
+            display: none !important; /* 详细模式下隐藏简洁行 */
         }
-        body:not(.dark) .prompt-item details > summary:hover {
-            color: #374151;
+
+        .evaluation-process .process-block {
+            background: rgba(50, 58, 70, 0.55);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
         }
-        /* 统一轻卡片样式（亮色） */
-        body:not(.dark) .panel {
-            background-color: #FFFFFF !important;
-            border: 1px solid #E5E7EB;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+        .evaluation-process .process-block h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #c4c9d4;
         }
-        /* 模型列表容器在亮色下的边框/背景 */
-        body:not(.dark) #model-list-container {
-            background-color: #FFFFFF;
-            border-color: #E5E7EB;
+
+        .evaluation-process .process-text {
+            white-space: pre-wrap;
+            font-size: 13px;
+            color: #e2e8f0;
+            line-height: 1.5;
         }
-        /* 亮色下标题/卡片标题改为纯黑 */
-        body:not(.dark) .section-title { color: #000000 !important; }
-        body:not(.dark) .prompt-item h4 { color: #000000 !important; }
+
+.evaluation-process .process-line strong {
+    color: #cbd5f5;
+}
+
+.process-toggle:hover {
+    background: rgba(66, 153, 225, 0.1);
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+}
+
+.process-wrapper {
+    margin-top: 8px;
+}
+
+.final-answer {
+    border-left: 3px solid var(--accent-purple);
+    padding-left: 12px;
+    margin-bottom: 8px;
+}
+
+.evaluation-status {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.evaluation-status.completed {
+    animation: none;
+    opacity: 1;
+}        /* 服务商项目样式 */
+        .provider-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+        
+        .provider-item:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 2px 8px rgba(66, 153, 225, 0.2);
+        }
+        
+        /* 聊天消息样式 */
+        .chat-message {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border-left: 4px solid var(--accent-purple);
+            animation: fadeIn 0.3s ease-in;
+            max-width: 75%;
+        }
+        
+        .chat-message.user {
+            background: rgba(66, 153, 225, 0.15);
+            border-left-color: var(--accent-blue);
+            margin-left: auto;
+            margin-right: 0;
+        }
+        
+        .chat-message.assistant {
+            margin-right: auto;
+            margin-left: 0;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 标题样式 */
+        .app-title {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(45deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .version-info {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        
+        /* 主题切换按钮 */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 1000;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        /* 输入区域 */
+        .input-area {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 1rem;
+        }
+        
+        .input-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .input-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 8px 8px 8px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toolbar-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+        
+        .message-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            resize: none;
+            outline: none;
+            min-height: 40px;
+            max-height: 200px;
+            padding: 8px;
+            font-size: 1rem;
+        }
+        
+        .message-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .submit-btn-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            padding-top: 8px;
+        }
+
+        #submit-btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #submit-btn:hover {
+            background: #3182ce;
+        }
+        #submit-btn:disabled {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+        }
+
+        /* 隐藏内容 */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* 选择框样式 */
+        select.form-input {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 8px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 32px;
+        }
+        
+        /* 复选框样式 */
+        .model-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .model-checkbox:hover {
+            background: var(--bg-card);
+            border-color: var(--accent-blue);
+        }
+        
+        .model-checkbox input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent-blue);
+        }
+        
+        /* 设置区域中的服务商卡片 */
+        .provider-item-settings {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+        
+        .provider-item-settings:hover {
+            border-color: var(--accent-blue);
+            background: rgba(66, 153, 225, 0.05);
+        }
+        
+        /* 紧凑模式 */
+        body.compact .panel { padding: 12px; }
+        body.compact .settings-item { padding: 10px 0; }
+        body.compact .chat-message { padding: 12px; margin-bottom: 12px; }
+        body.compact .settings-group { margin-bottom: 20px; }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chat-message {
+                max-width: 90%;
+            }
+            
+            .sidebar-toggle {
+                left: 10px !important;
+            }
+        }
+        
+        /* 设置按钮样式 */
+        .settings-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .settings-btn:hover {
+            background: var(--accent-blue);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+        }
+        
+        /* 设置模态框样式 */
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+        
+        .settings-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .settings-dialog {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            height: 80%;
+            max-height: 600px;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .settings-sidebar {
+            width: 240px;
+            background: var(--bg-tertiary);
+            border-right: 1px solid var(--border-color);
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+        
+        .settings-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        
+        .settings-nav-item {
+            padding: 10px 20px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .settings-nav-item:hover {
+            background: rgba(66, 153, 225, 0.1);
+            color: var(--text-primary);
+        }
+        
+        .settings-nav-item.active {
+            background: rgba(66, 153, 225, 0.15);
+            color: var(--accent-blue);
+            border-left-color: var(--accent-blue);
+        }
+        
+        .settings-section {
+            display: none;
+        }
+        
+        .settings-section.active {
+            display: block;
+        }
+        
+        .settings-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .settings-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .settings-group {
+            margin-bottom: 30px;
+        }
+        
+        .settings-group-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 15px;
+        }
+        
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+        
+        .settings-item-info {
+            flex: 1;
+        }
+        
+        .settings-item-title {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .settings-item-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        
+        .settings-toggle {
+            width: 44px;
+            height: 24px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .settings-toggle.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+        
+        .settings-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        
+        .settings-toggle.active::after {
+            transform: translateX(20px);
+        }
+        
+        .settings-select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            min-width: 150px;
+            cursor: pointer;
+        }
+        
+        .settings-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .settings-close:hover {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        /* 侧边栏手风琴 */
+        .settings-accordion .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: none;
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .settings-accordion .accordion-header:hover {
+            background: var(--bg-card);
+        }
+        .settings-accordion .accordion-header .chevron {
+            transition: transform 0.2s;
+        }
+        .settings-accordion .accordion-header.active .chevron {
+            transform: rotate(180deg);
+        }
+        .settings-accordion .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: var(--bg-primary);
+            border-radius: 0 0 6px 6px;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            font-size: 13px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .sidebar-item:hover {
+            background: var(--bg-secondary);
+        }
+        .sidebar-item.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+        .sidebar-item .name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans antialiased flex h-screen">
-    <button id="sidebar-toggle" class="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-white dark:bg-gray-700 p-1 rounded-full shadow-md transition-all duration-300">
-        <svg id="sidebar-toggle-icon" class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
-    </button>
-    <aside id="sidebar" class="w-1/3 max-w-md bg-white dark:bg-gray-800 p-4 overflow-y-auto h-full flex flex-col transition-all duration-300 relative">
-        <header class="text-center mb-4 flex-shrink-0">
-            <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-cyan-500">AI 工厂</h1>
-            <p class="text-xs text-gray-500 dark:text-gray-400">v14.0 - OCR增强版</p>
-        </header>
-        
-        <!-- 标签页导航 -->
-        <div class="flex mb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-            <button class="tab-btn active px-4 py-2 text-sm font-medium" data-tab="models" data-i18n="tab_models">模型配置</button>
-            <button class="tab-btn px-4 py-2 text-sm font-medium" data-tab="prompts" data-i18n="tab_prompts">提示词管理</button>
-            <button class="tab-btn px-4 py-2 text-sm font-medium" data-tab="settings" data-i18n="tab_settings">设置</button>
-        </div>
-        
-        <div class="flex-grow min-h-0 flex flex-col">
-            <!-- 模型配置标签页 -->
-            <div id="models-tab" class="tab-content active flex-grow min-h-0 flex flex-col">
-                <div class="mb-4 flex-shrink-0">
-                    <h2 class="text-xl font-bold mb-3 text-gray-700 dark:text-gray-300">服务商列表</h2>
-                    <div id="provider-list" class="space-y-2 mb-4"></div>
-                    <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
-                        <h3 class="text-md font-semibold mb-2">添加新服务商</h3>
-                        <form id="add-provider-form" class="space-y-2">
-                            <input name="name" required class="form-input text-sm" placeholder="自定义唯一名称" data-i18n-placeholder="prompt_name">
-                            <select name="type" required class="form-input text-sm">
-                                <option value="" disabled selected data-i18n-option="select_provider_type">选择服务商类型</option>
-                                <option value="OpenAI" data-i18n-option="openai_compatible">OpenAI 兼容型</option>
-                                <option value="Gemini" data-i18n-option="gemini">Google Gemini</option>
-                            </select>
-                            <input name="api_key" type="password" required class="form-input text-sm" placeholder="API Key" data-i18n-placeholder="api_key">
-                            <input name="api_base" class="form-input text-sm" placeholder="API Base URL (OpenAI型必填)" data-i18n-placeholder="api_base">
-                            <input name="models" required class="form-input text-sm" placeholder="模型列表 (逗号分隔)" data-i18n-placeholder="model_list">
-                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors" data-i18n-btn="add_btn">添加</button>
-                        </form>
+<body>
+    <div class="flex h-screen">
+        <!-- 侧边栏 -->
+        <aside class="sidebar w-80 flex-shrink-0" id="sidebar">
+            <div class="p-6 h-full flex flex-col">
+                <!-- 标题和历史记录按钮 -->
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="app-title">AI工厂</h1>
+                        <p class="version-info">v15.0 - Linus Edition</p>
+                    </div>
+                    <div class="relative">
+                        <button id="history-btn" class="p-2 rounded-md hover:bg-gray-700">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+                        <div id="history-popup" class="hidden absolute top-full right-0 mt-2 w-64 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20">
+                            <div class="p-3 border-b border-gray-700 font-semibold">历史记录</div>
+                            <div id="chat-history" class="p-2 max-h-80 overflow-y-auto">
+                                <div class="text-sm text-gray-400 text-center py-4">暂无历史记录</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div id="model-selection-area" class="flex-shrink-0">
-                    <label class="block text-md font-medium text-gray-700 dark:text-gray-300 mb-2">选择参战模型</label>
-                    <div id="model-list-container" class="space-y-1 max-h-48 overflow-y-auto p-2 bg-gray-100 dark:bg-gray-900/50 rounded-md border border-gray-300 dark:border-gray-700"></div>
+
+                <!-- 可折叠的设置区域 -->
+                <div class="flex-1 overflow-y-auto -mr-6 pr-4">
+                    <div class="space-y-4">
+                        <div class="settings-accordion">
+                            <button class="accordion-header">
+                                <span>🤖 模型配置</span>
+                                <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div class="accordion-content">
+                                <div id="model-list-sidebar" class="space-y-2 p-2"></div>
+                                <button id="manage-providers-btn" class="btn-secondary text-xs w-full mt-2">管理服务商</button>
+                            </div>
+                        </div>
+                        <div class="settings-accordion">
+                            <button class="accordion-header">
+                                <span>💬 提示词管理</span>
+                                <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div class="accordion-content">
+                                <div id="prompt-list-sidebar" class="space-y-2 p-2"></div>
+                                <button id="manage-prompts-btn" class="btn-secondary text-xs w-full mt-2">管理提示词</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- 提示词管理标签页 -->
-            <div id="prompts-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
-                <div class="space-y-4">
-                    <h2 class="section-title text-xl font-bold text-black dark:text-gray-300">提示词模板</h2>
-                    <div id="prompt-list" class="space-y-3"></div>
-                    <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
-                        <h3 class="text-md font-semibold mb-2">添加新提示词</h3>
-                        <form id="add-prompt-form" class="space-y-2">
-                            <input name="name" required class="form-input text-sm" placeholder="提示词名称" data-i18n-placeholder="prompt_name">
-                            <label class="text-xs text-gray-500 dark:text-gray-400" data-i18n="review_instruction">评审提示词（使用{question}、{target}、{answer}作为占位符）</label>
-                            <textarea name="critique_prompt" required class="form-input text-sm h-32" placeholder="评审提示词..." data-i18n-placeholder="review_placeholder"></textarea>
-                            <label class="text-xs text-gray-500 dark:text-gray-400" data-i18n="revise_instruction">修订提示词（使用{original}、{feedback}作为占位符）</label>
-                            <textarea name="revision_prompt" required class="form-input text-sm h-32" placeholder="修订提示词..." data-i18n-placeholder="revise_placeholder"></textarea>
-                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors" data-i18n-btn="add_btn">添加</button>
+            <!-- 设置按钮 -->
+            <button class="settings-btn" id="settings-btn">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span data-i18n="settings">设置</span>
+            </button>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <main class="main-content flex-1">
+            <!-- 侧边栏收起按钮 -->
+            <button class="sidebar-toggle" id="sidebar-toggle">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+            
+            <!-- 主题切换按钮 -->
+            <button id="theme-toggle" class="theme-toggle">
+                🌙 暗色
+            </button>
+            
+            <!-- 聊天区域 -->
+            <div class="chat-area" id="chat-log">
+                <!-- 示例对话 -->
+                <div class="chat-message user">
+                    <div class="font-medium mb-1">用户</div>
+                    <div>阿里云与华为云哪个对用户友好？</div>
+                </div>
+                
+                <div class="chat-message assistant">
+                    <div class="font-medium mb-1 text-purple-400">AI助手</div>
+                    <div class="mb-3">
+                        这是一个非常经典的问题，也是很多新用户在选型时首先考虑的。要回答"阿里云和华为云哪个对用户更友好"，我们需要从不同用户的角度来看，因为"友好"的定义因人而异。
+                    </div>
+                    <div class="mb-3">
+                        <strong>总的来说：两者都非常出色，但侧重点不同。阿里云对开发者、初创企业和互联网业务更友好；华为云对传统企业、政企客户和有强烈国产化需求的企业更友好。</strong>
+                    </div>
+                    <div class="mb-3">下面我从几个核心维度进行详细对比：</div>
+                    
+                    <div class="bg-slate-700 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">### 1. 产品易用性与控制台</h4>
+                        <div class="ml-4 space-y-2">
+                            <div><strong>• 阿里云：</strong></div>
+                            <div><strong>• 优点：</strong> 起步早、控制台经过多次优化，界面相对更现代化、更简洁。功能逻辑相对贴近开发者的思维习惯，文档和引导非常完善。</div>
+                            <div><strong>• 具体体验：</strong> 以创建云服务器（ECS）为例，阿里云提供一键购买和向导式配置，流程直观，适合快速部署。例如，在配置网络时，默认选项优化了常见场景，减少了新手困惑。</div>
+                            <div><strong>• 缺点：</strong> 产品线极其庞大，新手可能会在众多产品中感到困惑。部分老版控制台和新版控制台体验不统一。</div>
+                        </div>
+                        
+                        <div class="ml-4 mt-4 space-y-2">
+                            <div><strong>• 华为云：</strong></div>
+                            <div><strong>• 优点：</strong> 控制台近年来进步巨大，界面清晰，布局规整。在操作流程上，更偏向于企业级的严谨和步骤化。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 输入区域 -->
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-toolbar">
+                        <div class="toolbar-group">
+                            <button class="toolbar-btn" id="new-chat-btn" title="新对话">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            </button>
+                            <button class="toolbar-btn" id="select-image-btn" title="上传图片">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            </button>
+                            <input type="file" id="image-input" accept="image/*" style="display: none;">
+                        </div>
+                        <div class="toolbar-group">
+                            <span class="text-xs text-gray-500" id="token-counter">0/2000</span>
+                        </div>
+                    </div>
+                    <textarea 
+                        class="message-input" 
+                        placeholder="在这里输入消息, 按 Enter 发送"
+                        rows="1"
+                        id="question-input"
+                    ></textarea>
+                    <div class="submit-btn-wrapper">
+                        <button id="submit-btn" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- 设置模态框 -->
+    <div class="settings-modal" id="settings-modal">
+        <div class="settings-dialog">
+            <button class="settings-close" id="settings-close">&times;</button>
+            
+            <!-- 左侧导航 -->
+            <div class="settings-sidebar">
+                <div class="settings-nav-item active" data-section="general">
+                    <span>⚙️</span>
+                    <span data-i18n="preference">偏好</span>
+                </div>
+                <div class="settings-nav-item" data-section="appearance">
+                    <span>🎨</span>
+                    <span data-i18n="appearance">外观</span>
+                </div>
+                <div class="settings-nav-item" data-section="models">
+                    <span>🤖</span>
+                    <span data-i18n="models">模型</span>
+                </div>
+                <div class="settings-nav-item" data-section="prompts">
+                    <span>💬</span>
+                    <span data-i18n="prompts">提示词</span>
+                </div>
+                <div class="settings-nav-item" data-section="advanced">
+                    <span>🔧</span>
+                    <span data-i18n="advanced">高级</span>
+                </div>
+            </div>
+            
+            <!-- 右侧内容 -->
+            <div class="settings-content">
+                <!-- 偏好设置 -->
+                <div class="settings-section active" id="general-section">
+                    <h2 class="settings-title" data-i18n="preference">偏好</h2>
+                    <p class="settings-subtitle" data-i18n="basicSettings">基础设置，保持简单。</p>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="interface">界面</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="theme">主题</div>
+                            </div>
+                            <select class="settings-select" id="theme-mode-select">
+                                <option value="dark">深色</option>
+                                <option value="light">浅色</option>
+                            </select>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="language">语言</div>
+                            </div>
+                            <select class="settings-select" id="language-select">
+                                <option value="zh">简体中文</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="behavior">行为</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="autoSave">自动保存对话</div>
+                            </div>
+                            <div class="settings-toggle active" data-setting="auto-save"></div>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="showTimestamps">显示时间戳</div>
+                            </div>
+                            <div class="settings-toggle active" data-setting="timestamps"></div>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="soundNotification">声音提示</div>
+                            </div>
+                            <div class="settings-toggle" data-setting="sound"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 外观设置 -->
+                <div class="settings-section" id="appearance-section">
+                    <h2 class="settings-title" data-i18n="appearance">外观</h2>
+                    <p class="settings-subtitle" data-i18n="lessIsMore">少即是多。</p>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="display">显示</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="fontSize">字体大小</div>
+                            </div>
+                            <select class="settings-select" id="font-size-select">
+                                <option value="14">小 (14px)</option>
+                                <option value="16" selected>中 (16px)</option>
+                                <option value="18">大 (18px)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="compactMode">紧凑模式</div>
+                            </div>
+                            <div class="settings-toggle" data-setting="compact"></div>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="defaultSidebarOpen">默认展开侧边栏</div>
+                            </div>
+                            <div class="settings-toggle active" data-setting="sidebar-open"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="wallpaperSettings">壁纸设置</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <input type="file" id="wallpaper-upload" accept="image/*" style="display:none">
+                                <button id="wallpaper-upload-btn" class="btn-primary text-sm">上传壁纸</button>
+                                <button id="reset-wallpaper-btn" class="btn-danger text-sm ml-2">恢复默认</button>
+                                <div id="wallpaper-status" class="text-xs mt-2 text-gray-400"></div>
+                            </div>
+                            
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title" data-i18n="opacity">透明度</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="range" min="10" max="100" value="100" step="1" id="wallpaper-opacity" class="flex-1">
+                                    <span id="wallpaper-opacity-label" class="text-sm w-12 text-right">100%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title" data-i18n="brightness">亮度</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="range" min="20" max="200" value="100" step="1" id="wallpaper-brightness" class="flex-1">
+                                    <span id="wallpaper-brightness-label" class="text-sm w-12 text-right">100%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title" data-i18n="blur">模糊程度</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="range" min="0" max="20" value="0" step="1" id="wallpaper-blur" class="flex-1">
+                                    <span id="wallpaper-blur-label" class="text-sm w-12 text-right">0px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 语言与时间设置 -->
+                <div class="settings-section" id="language-section">
+                    <h2 class="settings-title">语言</h2>
+                    <p class="settings-subtitle">这部分已经合并到"偏好"中了。</p>
+                </div>
+                
+                <!-- AI模型配置 -->
+                <div class="settings-section" id="models-section">
+                    <h2 class="settings-title" data-i18n="modelConfig">模型配置</h2>
+                    <p class="settings-subtitle" data-i18n="manageAIServices">管理AI服务商及模型。</p>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="serviceProviderList">服务商列表</h3>
+                        <div id="provider-list-settings" class="space-y-3 mb-6"></div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="addNewProvider">添加新服务商</h3>
+                        <form id="add-provider-form" class="space-y-3 mb-6">
+                            <input name="name" required class="form-input" placeholder="服务商名称" style="width: 100%;">
+                            <select name="type" required class="form-input" style="width: 100%;">
+                                <option value="" disabled selected>类型</option>
+                                <option value="OpenAI">OpenAI</option>
+                                <option value="Gemini">Gemini</option>
+                            </select>
+                            <input name="api_key" type="password" required class="form-input" placeholder="API Key" style="width: 100%;">
+                            <input name="api_base" class="form-input" placeholder="Base URL (OpenAI必填)" style="width: 100%;">
+                            <input name="models" required class="form-input" placeholder="模型列表 (逗号分隔)" style="width: 100%;">
+                            <button type="submit" class="btn-success" style="width: 100%;">添加</button>
+                        </form>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="modelSelection">模型选择</h3>
+                        <div id="model-list-settings" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    </div>
+                </div>
+                
+                <!-- 提示词管理 -->
+                <div class="settings-section" id="prompts-section">
+                    <h2 class="settings-title" data-i18n="prompts">提示词</h2>
+                    <p class="settings-subtitle" data-i18n="managePromptTemplates">管理对话提示词模板。</p>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="promptList">提示词列表</h3>
+                        <div id="prompt-list-settings" class="space-y-3 mb-6"></div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="addNewPrompt">添加新提示词</h3>
+                        <form id="add-prompt-form" class="space-y-3">
+                            <input name="name_zh" required class="form-input" placeholder="中文名称" style="width: 100%;">
+                            <input name="name_en" required class="form-input" placeholder="English Name" style="width: 100%;">
+                            <textarea name="critique_zh" required class="form-input h-16" placeholder="评审提示词（中文）" style="width: 100%;"></textarea>
+                            <textarea name="critique_en" required class="form-input h-16" placeholder="Critique Prompt (English)" style="width: 100%;"></textarea>
+                            <textarea name="revision_zh" required class="form-input h-16" placeholder="修订提示词（中文）" style="width: 100%;"></textarea>
+                            <textarea name="revision_en" required class="form-input h-16" placeholder="Revision Prompt (English)" style="width: 100%;"></textarea>
+                            <button type="submit" class="btn-success" style="width: 100%;">添加</button>
                         </form>
                     </div>
                 </div>
-            </div>
-            <!-- 设置标签页 -->
-            <div id="settings-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
-                <div class="space-y-6">
-                    <h2 class="section-title text-xl font-bold text-black dark:text-gray-300" data-i18n="settings_title">界面设置</h2>
+                
+                <!-- 高级设置 -->
+                <div class="settings-section" id="advanced-section">
+                    <h2 class="settings-title" data-i18n="advanced">高级</h2>
+                    <p class="settings-subtitle" data-i18n="advancedSettings">仅在你知道自己在做什么时使用。</p>
                     
-                    <!-- 语言设置 -->
-                    <div id="lang-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
-                        <h3 class="font-semibold mb-2" data-i18n="lang_title">语言设置</h3>
-                        <label>
-                            <input type="radio" name="ui-lang" value="zh" checked> <span data-i18n="lang_zh">简体中文</span>
-                        </label>
-                        <label class="ml-6">
-                            <input type="radio" name="ui-lang" value="en"> <span data-i18n="lang_en">English</span>
-                        </label>
-                    </div>
-                    
-                    <!-- OCR模型设置 -->
-                    <div id="ocr-model-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel" style="display: block !important;">
-                        <h3 class="font-semibold mb-2 text-cyan-600 dark:text-cyan-400" data-i18n="ocr_model_title">📷 图片文字识别模型</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" data-i18n="ocr_model_tip">选择用于识别图片文字的模型（仅显示支持图片的模型）</p>
-                        <select id="ocr-model-select" class="form-input text-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
-                            <option value="">🤖 自动选择（使用第一个支持图片的模型）</option>
-                        </select>
-                        <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                            💡 提示：需要先在"模型配置"中勾选支持图片的模型
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="debug">调试</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="debugMode">调试模式</div>
+                            </div>
+                            <div class="settings-toggle" data-setting="debug"></div>
                         </div>
-                    </div>
-                    
-                    <!-- 壁纸设置 -->
-                    <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
-                        <h3 class="font-semibold mb-2" data-i18n="wallpaper_title">壁纸设置</h3>
-                        <div class="mb-3">
-                            <input type="file" id="wallpaper-upload" accept="image/*" style="display:inline-block">
-                            <button id="wallpaper-upload-btn" class="ml-2 font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 transition-colors" data-i18n="upload_wallpaper_btn">上传壁纸</button>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="apiLog">API日志</div>
+                            </div>
+                            <div class="settings-toggle" data-setting="api-log"></div>
                         </div>
-                        <div class="mb-3 flex items-center gap-2">
-                            <label class="w-20" data-i18n="wallpaper_opacity">透明度</label>
-                            <input type="range" min="10" max="100" value="100" step="1" id="wallpaper-opacity" style="vertical-align:middle">
-                            <span id="wallpaper-opacity-label">100%</span>
-                        </div>
-                        <div class="mb-3 flex items-center gap-2">
-                            <label class="w-20" data-i18n="wallpaper_brightness">亮度</label>
-                            <input type="range" min="20" max="200" value="100" step="1" id="wallpaper-brightness">
-                            <span id="wallpaper-brightness-label">100%</span>
-                        </div>
-                        <button id="wallpaper-reset-btn" class="font-bold py-1 px-3 text-sm rounded-md bg-gray-400 hover:bg-gray-500 transition-colors" data-i18n="reset_wallpaper_btn">重置壁纸</button>
                     </div>
 
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="evaluationDisplayGroup">互评展示</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="evaluationDisplay">互评过程展示程度</div>
+                                <div class="settings-item-desc" data-i18n="evaluationDisplayDesc">选择向用户展示的模型互评细节层级。</div>
+                            </div>
+                            <select class="settings-select" id="evaluation-display-select">
+                                <option value="simple">简要步骤（默认）</option>
+                                <option value="detailed">完整过程</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="performance">性能</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="requestTimeout">请求超时 (秒)</div>
+                            </div>
+                            <input type="number" class="settings-select" id="timeout-input" value="30" min="5" max="120" style="width: 80px;">
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="maxRetry">最大重试</div>
+                            </div>
+                            <input type="number" class="settings-select" id="retry-input" value="2" min="0" max="5" style="width: 80px;">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3 class="settings-group-title" data-i18n="data">数据</h3>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title" data-i18n="historyRetention">历史保留 (天)</div>
+                            </div>
+                            <select class="settings-select" id="retention-select">
+                                <option value="7">7</option>
+                                <option value="30" selected>30</option>
+                                <option value="90">90</option>
+                                <option value="-1">永久</option>
+                            </select>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="settings-item-title">操作</div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-primary text-xs" id="export-btn">导出</button>
+                                <button class="btn-danger text-xs" id="clear-btn">清除</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </aside>
-    <main class="flex-1 flex flex-col bg-gray-200/50 dark:bg-gray-800/50 h-full relative">
-        <div class="absolute top-4 right-4 z-10">
-            <button id="theme-toggle" class="px-3 py-1 text-sm rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                <svg id="theme-icon-sun" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM10 18a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1zM5.05 14.95l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM1.293 7.293a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zM18.707 7.293a1 1 0 00-1.414 0l-.707.707a1 1 0 101.414 1.414l.707-.707a1 1 0 000-1.414z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
-                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-                <span id="theme-text">暗色</span>
-            </button>
-        </div>
-        <div id="chat-log" class="flex-1 p-6 overflow-y-auto w-full"></div>
-        <div class="p-4 border-t border-gray-300 dark:border-gray-700 flex-shrink-0">
-                <!-- 图片标签显示区域 -->
-                <div id="selected-files-display" class="mb-3 px-2" style="display:none;">
-                    <div id="file-names-list" class="flex flex-wrap gap-2"></div>
-                </div>
-                
-                <div class="flex items-center space-x-2">
-                    <button id="new-chat-btn" title="开始新对话" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 flex-shrink-0">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15"/>
-                        </svg>
-                    </button>
-                    
-                    <!-- 图片选择按钮 -->
-                    <label for="bulk-image-input" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer flex-shrink-0" title="选择图片">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                        </svg>
-                    </label>
-                    <input type="file" id="bulk-image-input" accept="image/*" multiple class="hidden">
-                    
-                    <textarea id="question-input" rows="1" class="form-input flex-1 resize-none" placeholder="输入您的问题，或粘贴图片..." data-i18n-placeholder="input_placeholder"></textarea>
-
-                <!-- 发送按钮 -->
-                <button id="submit-btn" class="p-3 rounded-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 flex-shrink-0">
-                    <svg id="submit-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                    <svg id="loading-spinner" class="animate-spin h-6 w-6 text-white hidden" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                </button>
-                
-                <!-- 停止按钮（默认隐藏） -->
-                <button id="stop-btn" class="p-3 rounded-full bg-red-600 hover:bg-red-700 flex-shrink-0 hidden">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <rect x="6" y="6" width="12" height="12" rx="1"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </main>
-    
-    <!-- 图片预览模态框 -->
-    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center" style="display: none;">
-        <div class="relative max-w-[90vw] max-h-[90vh]">
-            <img id="preview-image" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="图片预览">
-            <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
-                <span id="preview-filename">文件名</span>
-            </div>
-            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm">
-                按任意键或点击任意位置关闭
-            </div>
-        </div>
     </div>
     
-    <div id="details-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-cyan-400">生成过程详情</h2>
-                <button id="close-modal-btn" class="text-3xl font-bold p-2 leading-none rounded-full hover:bg-gray-700">&times;</button>
-            </div>
-            <div id="process-details-container" class="space-y-6"></div>
-        </div>
-    </div>
-    
-    <!-- 图片预览模态框 -->
-    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-95 z-[9999]" style="display:none;">
-        <div class="relative w-full h-full flex flex-col items-center justify-center">
-            <div class="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-6 py-3 rounded-lg text-sm shadow-2xl z-10">
-                <span id="preview-filename" class="font-semibold text-lg"></span>
-                <span class="ml-4 text-gray-300">按任意键或点击关闭</span>
-            </div>
-            <img id="preview-image" src="" alt="图片预览" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl">
-        </div>
-    </div>
-    <script>
-        // 启用调试模式
-        window.DEBUG = true;
-    </script>
     <script src="/static/script.js?v=20251031003000"></script>
+    <script>
+        // 设置系统 - 保证在任何调用 S 之前定义
+        const S = {
+            get: (k, d) => localStorage.getItem(k) || d,
+            set: (k, v) => localStorage.setItem(k, v),
+            apply: (k, fn) => fn(S.get(k))
+        };
+
+        // 简单的标签页切换功能
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 移除所有活动状态
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // 设置当前活动状态
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab') + '-tab';
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // 主题切换功能 - 实时反馈
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            S.set('theme', isDark ? 'dark' : 'light');
+            
+            // 更新按钮文本
+            const themeBtn = document.getElementById('theme-toggle');
+            if (themeBtn) {
+                themeBtn.textContent = isDark ? '🌙 暗色' : '☀️ 亮色';
+            }
+            
+            // 更新主题模式选择器
+            const themeModeSelect = document.getElementById('theme-mode-select');
+            if (themeModeSelect) {
+                themeModeSelect.value = isDark ? 'dark' : 'light';
+            }
+            
+            // 重新应用壁纸（因为主题切换可能影响背景）
+            applyBgImage();
+        }
+        
+        // 初始化主题
+        const savedTheme = S.get('theme', 'dark');
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+            const themeBtn = document.getElementById('theme-toggle');
+            if (themeBtn) themeBtn.textContent = '🌙 暗色';
+        } else {
+            document.documentElement.classList.remove('dark');
+            const themeBtn = document.getElementById('theme-toggle');
+            if (themeBtn) themeBtn.textContent = '☀️ 亮色';
+        }
+        
+        // 确保主题选择器同步
+        const themeModeSelect = document.getElementById('theme-mode-select');
+        if (themeModeSelect) {
+            themeModeSelect.value = savedTheme;
+        }
+        
+        // 绑定主题切换按钮
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', toggleTheme);
+        }
+        
+        // 自动调整输入框高度
+        const messageInput = document.getElementById('question-input');
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+        
+        // 设置模态框功能
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsClose = document.getElementById('settings-close');
+        
+        // 打开设置
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('active');
+        });
+        
+        // 关闭设置
+        settingsClose.addEventListener('click', () => {
+            settingsModal.classList.remove('active');
+        });
+        
+        // 点击背景关闭
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.remove('active');
+            }
+        });
+        
+        // 设置导航切换
+        document.querySelectorAll('.settings-nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                // 移除所有活动状态
+                document.querySelectorAll('.settings-nav-item').forEach(nav => nav.classList.remove('active'));
+                document.querySelectorAll('.settings-section').forEach(section => section.classList.remove('active'));
+                
+                // 设置当前活动状态
+                item.classList.add('active');
+                const sectionId = item.getAttribute('data-section') + '-section';
+                document.getElementById(sectionId).classList.add('active');
+            });
+        });
+        
+        // 侧边栏收起功能
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebar', sidebar.classList.contains('collapsed') ? '0' : '1');
+        });
+        
+        // 恢复状态
+        if (localStorage.getItem('sidebar') === '0') sidebar.classList.add('collapsed');
+        
+        // 主题
+        const theme = document.getElementById('theme-mode-select');
+        theme.value = S.get('theme', 'dark');
+        theme.onchange = e => {
+            const val = e.target.value;
+            S.set('theme', val);
+            if (val === 'dark') {
+                document.documentElement.classList.add('dark');
+                const themeBtn = document.getElementById('theme-toggle');
+                if (themeBtn) themeBtn.textContent = '🌙 暗色';
+            } else {
+                document.documentElement.classList.remove('dark');
+                const themeBtn = document.getElementById('theme-toggle');
+                if (themeBtn) themeBtn.textContent = '☀️ 亮色';
+            }
+        };
+        // 初始化主题（已在上面处理）
+        
+        // 互评展示层级
+        const evaluationDisplaySelect = document.getElementById('evaluation-display-select');
+        if (evaluationDisplaySelect) {
+            evaluationDisplaySelect.value = S.get('evaluation_display', 'simple');
+            evaluationDisplaySelect.onchange = (e) => {
+                S.set('evaluation_display', e.target.value);
+            };
+        }
+
+        // 语言
+        const lang = document.getElementById('language-select');
+        lang.value = S.get('lang', 'zh');
+        lang.onchange = e => {
+            S.set('lang', e.target.value);
+            applyLanguage(e.target.value);
+        };
+        
+        // 语言翻译字典
+        const i18n = {
+            zh: {
+                newChat: '新对话',
+                selectImage: '选择图片',
+                placeholder: '在这里输入消息, 按 Enter 发送',
+                chatHistory: '历史记录',
+                noHistory: '暂无历史记录',
+                settings: '设置',
+                user: '用户',
+                aiAssistant: 'AI助手',
+                newChatStarted: '新对话已开始',
+                selectModelFirst: '请先在侧边栏选择至少一个模型',
+                imageUploaded: '已上传图片：',
+                aiFactory: 'AI工厂',
+                preference: '偏好',
+                appearance: '外观',
+                models: '模型',
+                prompts: '提示词',
+                advanced: '高级',
+                theme: '主题',
+                language: '语言',
+                dark: '深色',
+                light: '浅色',
+                simplifiedChinese: '简体中文',
+                english: 'English',
+                autoSave: '自动保存对话',
+                showTimestamps: '显示时间戳',
+                soundNotification: '声音提示',
+                fontSize: '字体大小',
+                compactMode: '紧凑模式',
+                defaultSidebarOpen: '默认展开侧边栏',
+                wallpaperSettings: '壁纸设置',
+                opacity: '透明度',
+                brightness: '亮度',
+                blur: '模糊程度',
+                uploadWallpaper: '上传壁纸',
+                resetWallpaper: '恢复默认',
+                evaluationDisplay: '互评过程展示程度',
+                simpleSteps: '简要步骤（默认）',
+                fullProcess: '完整过程',
+                debugMode: '调试模式',
+                apiLog: 'API日志',
+                requestTimeout: '请求超时 (秒)',
+                maxRetry: '最大重试',
+                historyRetention: '历史保留 (天)',
+                permanent: '永久',
+                export: '导出',
+                clear: '清除',
+                confirmClearAll: '确定清除所有数据？',
+                evaluationStarted: '互评流程已启动，正在等待结果...',
+                initialAnswerComplete: '已完成初始答案',
+                initialAnswer: '初始答案',
+                critiqueComplete: '已完成对 {target} 的评分，得分 {score}',
+                critiqueFor: '对 {target} 的评审',
+                totalScore: '总分',
+                accuracy: '准确性',
+                completeness: '完整性',
+                clarity: '清晰性',
+                usefulness: '实用性',
+                revisionComplete: '已提交改进答案',
+                revisedAnswer: '改进答案',
+                evaluationComplete: '✓ 互评完成，答案已生成',
+                answerGenerated: '✓ 答案已生成',
+                finalAnswerGenerated: '最终答案已生成。',
+                processingFailed: '❌ 处理失败',
+                evaluationTerminated: '互评流程已终止。',
+                requestFailed: '请求失败',
+                showProcess: '▼ 查看互评过程',
+                hideProcess: '▲ 收起互评过程',
+                noContent: '(无内容)',
+                uploadingWallpaper: '正在处理壁纸...',
+                wallpaperUpdated: '壁纸已更新。',
+                wallpaperReset: '已恢复默认壁纸。',
+                wallpaperSaved: '当前已使用自定义壁纸。',
+                wallpaperDefault: '使用默认壁纸。',
+                wallpaperError: '保存失败：浏览器存储空间不足。',
+                wallpaperFileError: '文件读取失败。',
+                wallpaperSizeError: '图片大于 4MB，请压缩后再试。',
+                confirmResetWallpaper: '确定恢复默认壁纸？',
+                noAnswerAvailable: '暂无可用答案',
+                evaluationDisplayGroup: '互评展示',
+                evaluationDisplayDesc: '选择向用户展示的模型互评细节层级。',
+                behavior: '行为',
+                modelConfig: '模型配置',
+                promptManagement: '提示词管理',
+                manageProviders: '管理服务商',
+                managePrompts: '管理提示词',
+                basicSettings: '基础设置，保持简单。',
+                manageAIServices: '管理AI服务商及模型。',
+                managePromptTemplates: '管理对话提示词模板。',
+                advancedSettings: '仅在你知道自己在做什么时使用。',
+                interface: '界面',
+                display: '显示',
+                performance: '性能',
+                data: '数据',
+                debug: '调试',
+                serviceProviderList: '服务商列表',
+                addNewProvider: '添加新服务商',
+                modelSelection: '模型选择',
+                promptList: '提示词列表',
+                addNewPrompt: '添加新提示词',
+                lessIsMore: '少即是多。',
+                requestTimeoutSeconds: '请求超时 (秒)',
+                historyRetentionDays: '历史保留 (天)',
+                evaluationProcessDisplayLevel: '互评过程展示程度'
+            },
+            en: {
+                newChat: 'New Chat',
+                selectImage: 'Select Image',
+                placeholder: 'Enter your message here, press Enter to send',
+                chatHistory: 'History',
+                noHistory: 'No history yet',
+                settings: 'Settings',
+                user: 'User',
+                aiAssistant: 'AI Assistant',
+                newChatStarted: 'New chat started',
+                selectModelFirst: 'Please select at least one model in the sidebar first',
+                imageUploaded: 'Image uploaded:',
+                aiFactory: 'AI Factory',
+                preference: 'Preference',
+                appearance: 'Appearance',
+                models: 'Models',
+                prompts: 'Prompts',
+                advanced: 'Advanced',
+                theme: 'Theme',
+                language: 'Language',
+                dark: 'Dark',
+                light: 'Light',
+                simplifiedChinese: 'Simplified Chinese',
+                english: 'English',
+                autoSave: 'Auto-save conversations',
+                showTimestamps: 'Show timestamps',
+                soundNotification: 'Sound notifications',
+                fontSize: 'Font Size',
+                compactMode: 'Compact Mode',
+                defaultSidebarOpen: 'Default sidebar open',
+                wallpaperSettings: 'Wallpaper Settings',
+                opacity: 'Opacity',
+                brightness: 'Brightness',
+                blur: 'Blur',
+                uploadWallpaper: 'Upload Wallpaper',
+                resetWallpaper: 'Reset Default',
+                evaluationDisplay: 'Evaluation Display Level',
+                simpleSteps: 'Simple Steps (Default)',
+                fullProcess: 'Full Process',
+                debugMode: 'Debug Mode',
+                apiLog: 'API Log',
+                requestTimeout: 'Request Timeout (seconds)',
+                maxRetry: 'Max Retry',
+                historyRetention: 'History Retention (days)',
+                permanent: 'Permanent',
+                export: 'Export',
+                clear: 'Clear',
+                confirmClearAll: 'Are you sure to clear all data?',
+                evaluationStarted: 'Evaluation process started, waiting for results...',
+                initialAnswerComplete: 'completed initial answer',
+                initialAnswer: 'Initial Answer',
+                critiqueComplete: 'completed evaluation of {target}, score {score}',
+                critiqueFor: 'Evaluation of {target}',
+                totalScore: 'Total Score',
+                accuracy: 'Accuracy',
+                completeness: 'Completeness',
+                clarity: 'Clarity',
+                usefulness: 'Usefulness',
+                revisionComplete: 'submitted improved answer',
+                revisedAnswer: 'Revised Answer',
+                evaluationComplete: '✓ Evaluation complete, answer generated',
+                answerGenerated: '✓ Answer generated',
+                finalAnswerGenerated: 'Final answer generated.',
+                processingFailed: '❌ Processing failed',
+                evaluationTerminated: 'Evaluation process terminated.',
+                requestFailed: 'Request failed',
+                showProcess: '▼ Show evaluation process',
+                hideProcess: '▲ Hide evaluation process',
+                noContent: '(No content)',
+                uploadingWallpaper: 'Processing wallpaper...',
+                wallpaperUpdated: 'Wallpaper updated.',
+                wallpaperReset: 'Wallpaper reset to default.',
+                wallpaperSaved: 'Currently using custom wallpaper.',
+                wallpaperDefault: 'Using default wallpaper.',
+                wallpaperError: 'Save failed: Insufficient browser storage space.',
+                wallpaperFileError: 'File read failed.',
+                wallpaperSizeError: 'Image is larger than 4MB, please compress it first.',
+                confirmResetWallpaper: 'Are you sure to reset to default wallpaper?',
+                noAnswerAvailable: 'No answer available',
+                evaluationDisplayGroup: 'Evaluation Display',
+                evaluationDisplayDesc: 'Select the level of model evaluation details to display to users.',
+                behavior: 'Behavior',
+                modelConfig: 'Model Configuration',
+                promptManagement: 'Prompt Management',
+                manageProviders: 'Manage Providers',
+                managePrompts: 'Manage Prompts',
+                basicSettings: 'Basic settings, keep it simple.',
+                manageAIServices: 'Manage AI service providers and models.',
+                managePromptTemplates: 'Manage conversation prompt templates.',
+                advancedSettings: 'Only use when you know what you\'re doing.',
+                interface: 'Interface',
+                display: 'Display',
+                performance: 'Performance',
+                data: 'Data',
+                debug: 'Debug',
+                serviceProviderList: 'Service Provider List',
+                addNewProvider: 'Add New Provider',
+                modelSelection: 'Model Selection',
+                promptList: 'Prompt List',
+                addNewPrompt: 'Add New Prompt',
+                lessIsMore: 'Less is more.',
+                requestTimeout: 'Request Timeout (seconds)',
+                maxRetry: 'Max Retry',
+                historyRetention: 'History Retention (days)'
+            }
+        };
+        
+        function applyLanguage(l) {
+            const t = i18n[l] || i18n.zh;
+            
+            // 更新按钮和输入框
+            const newChatBtn = document.getElementById('new-chat-btn');
+            if (newChatBtn) newChatBtn.title = t.newChat;
+            const selectImageBtn = document.getElementById('select-image-btn');
+            if (selectImageBtn) selectImageBtn.title = t.selectImage;
+            const questionInput = document.getElementById('question-input');
+            if (questionInput) questionInput.placeholder = t.placeholder;
+            
+            // 更新历史记录弹窗
+            const histTitle = document.querySelector('#history-popup .font-semibold');
+            if (histTitle) histTitle.textContent = t.chatHistory;
+            const noHistoryMsg = document.querySelector('#chat-history .text-center');
+            if (noHistoryMsg && noHistoryMsg.textContent.includes('暂无历史记录')) {
+                noHistoryMsg.textContent = t.noHistory;
+            }
+            
+            // 更新设置导航项（使用data-i18n的子元素）
+            const settingsNavItems = document.querySelectorAll('.settings-nav-item');
+            settingsNavItems.forEach(item => {
+                const i18nSpan = item.querySelector('[data-i18n]');
+                if (i18nSpan) {
+                    const key = i18nSpan.getAttribute('data-i18n');
+                    if (t[key]) {
+                        i18nSpan.textContent = t[key];
+                    }
+                }
+            });
+            
+            // 更新所有带 data-i18n 属性的元素（但排除导航项中的span，因为已经在上面单独处理了）
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                // 跳过导航项中的span，因为已经在上面单独处理了
+                if (el.closest('.settings-nav-item')) {
+                    return;
+                }
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+            
+            // 更新选项文本
+            const themeSelect = document.getElementById('theme-mode-select');
+            if (themeSelect) {
+                themeSelect.options[0].text = t.dark;
+                themeSelect.options[1].text = t.light;
+            }
+            const langSelect = document.getElementById('language-select');
+            if (langSelect) {
+                langSelect.options[0].text = t.simplifiedChinese;
+                langSelect.options[1].text = t.english;
+            }
+            const evalSelect = document.getElementById('evaluation-display-select');
+            if (evalSelect) {
+                evalSelect.options[0].text = t.simpleSteps;
+                evalSelect.options[1].text = t.fullProcess;
+            }
+            
+            // 更新设置项标题
+            const titleMap = {
+                'theme': t.theme,
+                'language': t.language,
+                'auto-save': t.autoSave,
+                'timestamps': t.showTimestamps,
+                'sound': t.soundNotification,
+                'font-size': t.fontSize,
+                'compact': t.compactMode,
+                'sidebar-open': t.defaultSidebarOpen,
+                'wallpaper': t.wallpaperSettings,
+                'opacity': t.opacity,
+                'brightness': t.brightness,
+                'blur': t.blur,
+                'evaluation-display': t.evaluationDisplay,
+                'debug': t.debugMode,
+                'api-log': t.apiLog,
+                'timeout': t.requestTimeout,
+                'retry': t.maxRetry,
+                'retention': t.historyRetention,
+                'export': t.export,
+                'clear': t.clear
+            };
+            
+            document.querySelectorAll('.settings-item-title').forEach(el => {
+                const parent = el.closest('.settings-item');
+                if (parent) {
+                    const setting = parent.querySelector('[data-setting]');
+                    if (setting && titleMap[setting.getAttribute('data-setting')]) {
+                        el.textContent = titleMap[setting.getAttribute('data-setting')];
+                    }
+                }
+            });
+            
+            // 更新壁纸按钮文本
+            const uploadBtn = document.getElementById('wallpaper-upload-btn');
+            if (uploadBtn) uploadBtn.textContent = t.uploadWallpaper;
+            const resetBtn = document.getElementById('reset-wallpaper-btn');
+            if (resetBtn) resetBtn.textContent = t.resetWallpaper;
+            
+            // 更新设置组标题和描述
+            document.querySelectorAll('.settings-group-title').forEach(title => {
+                if (title.textContent.includes('互评展示')) {
+                    title.textContent = t.evaluationDisplayGroup;
+                } else if (title.textContent.includes('行为')) {
+                    title.textContent = t.behavior;
+                } else if (title.textContent.includes('模型配置')) {
+                    title.textContent = t.modelConfig;
+                } else if (title.textContent.includes('提示词管理')) {
+                    title.textContent = t.promptManagement;
+                }
+            });
+            
+            document.querySelectorAll('.settings-item-desc').forEach(desc => {
+                if (desc.textContent.includes('选择向用户展示')) {
+                    desc.textContent = t.evaluationDisplayDesc;
+                }
+            });
+            
+            // 更新设置子标题
+            document.querySelectorAll('.settings-subtitle').forEach(subtitle => {
+                if (subtitle.textContent.includes('基础设置')) {
+                    subtitle.textContent = t.basicSettings;
+                } else if (subtitle.textContent.includes('管理AI服务商')) {
+                    subtitle.textContent = t.manageAIServices;
+                } else if (subtitle.textContent.includes('管理对话提示词')) {
+                    subtitle.textContent = t.managePromptTemplates;
+                } else if (subtitle.textContent.includes('仅在你知道')) {
+                    subtitle.textContent = t.advancedSettings;
+                }
+            });
+            
+            // 更新按钮文本
+            const manageProvidersBtn = document.getElementById('manage-providers-btn');
+            if (manageProvidersBtn) manageProvidersBtn.textContent = t.manageProviders;
+            const managePromptsBtn = document.getElementById('manage-prompts-btn');
+            if (managePromptsBtn) managePromptsBtn.textContent = t.managePrompts;
+            
+            // 更新侧边栏手风琴标题
+            document.querySelectorAll('.accordion-header span').forEach(span => {
+                if (span.textContent.includes('模型配置')) {
+                    span.textContent = '🤖 ' + t.modelConfig;
+                } else if (span.textContent.includes('提示词管理')) {
+                    span.textContent = '💬 ' + t.promptManagement;
+                }
+            });
+            
+            // 更新示例对话中的文本（如果有的话）
+            const exampleUser = document.querySelector('#chat-log .chat-message.user .font-medium');
+            if (exampleUser && exampleUser.textContent === '用户') {
+                exampleUser.textContent = t.user;
+            }
+            const exampleAI = document.querySelector('#chat-log .chat-message.assistant .font-medium');
+            if (exampleAI && exampleAI.textContent === 'AI助手') {
+                exampleAI.textContent = t.aiAssistant;
+            }
+            
+            // 保存当前语言以便后续使用
+            window.currentLang = l;
+            
+            // 如果时间戳功能已开启，重新应用时间戳（更新语言格式）
+            if (S.get('sw_timestamps') === '1') {
+                setTimeout(() => {
+                    applyToggleSetting('timestamps', true);
+                }, 100);
+            }
+        }
+        applyLanguage(lang.value);
+        
+        // 初始化时加载历史记录（如果有）
+        // 页面加载完成后检查并应用时间戳
+        window.addEventListener('DOMContentLoaded', () => {
+            // 延迟执行，确保所有元素都已加载
+            setTimeout(() => {
+                if (S.get('sw_timestamps') === '1') {
+                    applyToggleSetting('timestamps', true);
+                }
+            }, 500);
+        });
+        
+        // 字体
+        const font = document.getElementById('font-size-select');
+        font.value = S.get('font', '16');
+        font.onchange = e => {
+            S.set('font', e.target.value);
+            document.documentElement.style.fontSize = e.target.value + 'px';
+        };
+        document.documentElement.style.fontSize = font.value + 'px';
+        
+        // 超时和重试
+        const timeout = document.getElementById('timeout-input');
+        const retry = document.getElementById('retry-input');
+        const retention = document.getElementById('retention-select');
+        
+        timeout.value = S.get('timeout', '30');
+        retry.value = S.get('retry', '2');
+        retention.value = S.get('retention', '30');
+        
+        timeout.onchange = e => S.set('timeout', e.target.value);
+        retry.onchange = e => S.set('retry', e.target.value);
+        retention.onchange = e => S.set('retention', e.target.value);
+        
+        // 导出/清除
+        document.getElementById('export-btn').onclick = () => {
+            const data = { ...localStorage };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'ai-factory-' + Date.now() + '.json';
+            a.click();
+        };
+        
+        document.getElementById('clear-btn').onclick = () => {
+            const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+            if (confirm(t.confirmClearAll)) {
+                localStorage.clear();
+                location.reload();
+            }
+        };
+        
+        // 所有开关 - 一次搞定
+        document.querySelectorAll('.settings-toggle[data-setting]').forEach(t => {
+            const k = 'sw_' + t.dataset.setting;
+            const setting = t.dataset.setting;
+            
+            // 恢复状态
+            if (S.get(k) === '1') t.classList.add('active');
+            
+            // 初始化应用
+            applyToggleSetting(setting, t.classList.contains('active'));
+            
+            // 点击切换
+            t.onclick = () => {
+                t.classList.toggle('active');
+                const active = t.classList.contains('active');
+                S.set(k, active ? '1' : '0');
+                applyToggleSetting(setting, active);
+            };
+        });
+        
+        // 应用开关设置
+        function applyToggleSetting(setting, active) {
+            switch(setting) {
+                case 'compact':
+                    document.body.classList.toggle('compact', active);
+                    break;
+                case 'timestamps':
+                    // 时间戳显示逻辑 - 为所有消息添加或移除时间戳
+                    const showTimestamps = active;
+                    const chatMessages = document.querySelectorAll('.chat-message');
+                    chatMessages.forEach(msg => {
+                        const existingTimestamp = msg.querySelector('.message-timestamp');
+                        if (showTimestamps) {
+                            if (!existingTimestamp) {
+                                let timestamp = msg.getAttribute('data-timestamp');
+                                // 如果没有时间戳，使用当前时间
+                                if (!timestamp) {
+                                    timestamp = Date.now().toString();
+                                    msg.setAttribute('data-timestamp', timestamp);
+                                }
+                                
+                                const timeEl = document.createElement('div');
+                                timeEl.className = 'message-timestamp';
+                                timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px; opacity: 0.7;';
+                                const date = new Date(parseInt(timestamp));
+                                const lang = window.currentLang || 'zh';
+                                if (lang === 'en') {
+                                    timeEl.textContent = date.toLocaleString('en-US', { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    });
+                                } else {
+                                    timeEl.textContent = date.toLocaleString('zh-CN', { 
+                                        month: 'numeric', 
+                                        day: 'numeric', 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    });
+                                }
+                                msg.appendChild(timeEl);
+                            } else {
+                                // 更新时间戳文本（语言切换时）
+                                const timestamp = msg.getAttribute('data-timestamp');
+                                if (timestamp) {
+                                    const date = new Date(parseInt(timestamp));
+                                    const lang = window.currentLang || 'zh';
+                                    if (lang === 'en') {
+                                        existingTimestamp.textContent = date.toLocaleString('en-US', { 
+                                            month: 'short', 
+                                            day: 'numeric', 
+                                            hour: '2-digit', 
+                                            minute: '2-digit' 
+                                        });
+                                    } else {
+                                        existingTimestamp.textContent = date.toLocaleString('zh-CN', { 
+                                            month: 'numeric', 
+                                            day: 'numeric', 
+                                            hour: '2-digit', 
+                                            minute: '2-digit' 
+                                        });
+                                    }
+                                }
+                            }
+                        } else if (!showTimestamps && existingTimestamp) {
+                            existingTimestamp.remove();
+                        }
+                    });
+                    break;
+                case 'sidebar-open':
+                    // 侧边栏默认状态（启动时应用）
+                    if (active && sidebar.classList.contains('collapsed')) {
+                        sidebar.classList.remove('collapsed');
+                    }
+                    break;
+                case 'auto-save':
+                    console.log('自动保存:', active);
+                    break;
+                case 'sound':
+                    console.log('声音提示:', active);
+                    break;
+                case 'debug':
+                    console.log('调试模式:', active);
+                    break;
+                case 'api-log':
+                    console.log('API日志:', active);
+                    break;
+            }
+        }
+        
+        // 开始新对话
+        document.getElementById('new-chat-btn').onclick = () => {
+            const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+            document.getElementById('chat-log').innerHTML = `<div class="text-center text-gray-400 py-8">${t.newChatStarted}</div>`;
+            document.getElementById('question-input').value = '';
+            document.getElementById('question-input').focus();
+        };
+        
+        // 发送消息
+        const submitBtn = document.getElementById('submit-btn');
+        const questionInput = document.getElementById('question-input');
+
+        questionInput.addEventListener('input', () => {
+            if (questionInput.value.trim().length > 0) {
+                submitBtn.disabled = false;
+            } else {
+                submitBtn.disabled = true;
+            }
+        });
+
+        submitBtn.onclick = async () => {
+            const question = questionInput.value.trim();
+            if (!question) return;
+            
+            const selectedModels = JSON.parse(S.get('models', '[]'));
+            if (selectedModels.length === 0) {
+                const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+                alert(t.selectModelFirst);
+                return;
+            }
+            
+            // 添加用户消息
+            const chatLog = document.getElementById('chat-log');
+            const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'chat-message user';
+            userMsgDiv.setAttribute('data-timestamp', Date.now().toString());
+            userMsgDiv.innerHTML = `<div class="font-medium mb-1">${t.user}</div><div>${question}</div>`;
+            
+            // 如果时间戳功能开启，添加时间戳
+            if (S.get('sw_timestamps') === '1') {
+                const timeEl = document.createElement('div');
+                timeEl.className = 'message-timestamp';
+                timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px;';
+                const date = new Date();
+                const lang = window.currentLang || 'zh';
+                if (lang === 'en') {
+                    timeEl.textContent = date.toLocaleString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                } else {
+                    timeEl.textContent = date.toLocaleString('zh-CN', { 
+                        month: 'numeric', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                }
+                userMsgDiv.appendChild(timeEl);
+            }
+            
+            chatLog.appendChild(userMsgDiv);
+            
+            questionInput.value = '';
+            questionInput.disabled = true;
+            submitBtn.disabled = true;
+        
+            // 添加AI响应占位
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'chat-message assistant';
+            aiMsg.setAttribute('data-timestamp', Date.now().toString());
+            const t2 = i18n[window.currentLang || 'zh'] || i18n.zh;
+            aiMsg.innerHTML = `<div class="font-medium mb-1 text-purple-400">${t2.aiAssistant}</div><div class="response-content"></div>`;
+            chatLog.appendChild(aiMsg);
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+        const responseContent = aiMsg.querySelector('.response-content');
+        
+        // 创建步骤状态显示区域
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'evaluation-status';
+        statusDiv.style.cssText = `
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(37, 41, 50, 0.6);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-blue);
+        `;
+        statusDiv.textContent = '正在初始化...';
+        
+        const finalAnswerDiv = document.createElement('div');
+        finalAnswerDiv.className = 'final-answer';
+        finalAnswerDiv.style.whiteSpace = 'pre-wrap';
+        finalAnswerDiv.style.fontSize = '15px';
+        finalAnswerDiv.style.lineHeight = '1.6';
+        finalAnswerDiv.style.color = '#e2e8f0';
+        finalAnswerDiv.style.display = 'none'; // 初始隐藏，等有答案时显示
+
+        const evaluationMode = S.get('evaluation_display', 'simple');
+        
+        // 创建可折叠的进度容器
+        const processWrapper = document.createElement('div');
+        processWrapper.className = 'process-wrapper';
+        
+        const processToggle = document.createElement('button');
+        processToggle.className = 'process-toggle';
+        const t_process = i18n[window.currentLang || 'zh'] || i18n.zh;
+        processToggle.innerHTML = t_process.showProcess;
+        processToggle.style.cssText = `
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 12px;
+            transition: all 0.2s;
+            display: none;
+        `;
+        
+        const processContainer = document.createElement('div');
+        processContainer.className = `evaluation-process ${evaluationMode}`;
+        processContainer.style.display = 'none'; // 默认折叠
+        
+        processToggle.onclick = () => {
+            const isHidden = processContainer.style.display === 'none';
+            processContainer.style.display = isHidden ? 'block' : 'none';
+            const t_toggle = i18n[window.currentLang || 'zh'] || i18n.zh;
+            processToggle.innerHTML = isHidden ? t_toggle.hideProcess : t_toggle.showProcess;
+        };
+
+        const appendProcessLine = (text) => {
+            if (!text || evaluationMode !== 'simple') return; // 只在简单模式下添加
+            const line = document.createElement('div');
+            line.className = 'process-line';
+            line.textContent = text;
+            processContainer.appendChild(line);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        };
+
+            const appendDetailedBlock = (title, content, meta = '') => {
+                if (evaluationMode !== 'detailed') return; // Good Taste: If not detailed, do nothing.
+                const block = document.createElement('div');
+                block.className = 'process-block';
+
+                if (title) {
+                    const heading = document.createElement('h4');
+                    heading.textContent = title;
+                    block.appendChild(heading);
+                }
+
+                if (meta) {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.style.color = '#9ca3af';
+                    metaDiv.style.fontSize = '12px';
+                    metaDiv.style.marginBottom = '8px';
+                    metaDiv.textContent = meta;
+                    block.appendChild(metaDiv);
+                }
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'process-text';
+                const t_empty = i18n[window.currentLang || 'zh'] || i18n.zh;
+                textDiv.textContent = content || t_empty.noContent;
+                block.appendChild(textDiv);
+
+                processContainer.appendChild(block);
+                chatLog.scrollTop = chatLog.scrollHeight;
+            };
+
+        responseContent.appendChild(statusDiv);
+        responseContent.appendChild(finalAnswerDiv);
+        processWrapper.appendChild(processToggle);
+        processWrapper.appendChild(processContainer);
+        responseContent.appendChild(processWrapper);
+
+        // Only show process container if there's something to show
+        if (selectedModels.length > 1) {
+            const t_start = i18n[window.currentLang || 'zh'] || i18n.zh;
+            appendProcessLine(t_start.evaluationStarted);
+        }
+            try {
+                const resp = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        selected_models: selectedModels,
+                        history: []
+                    })
+                });
+                
+                const t_error = i18n[window.currentLang || 'zh'] || i18n.zh;
+                if (!resp.ok) throw new Error(t_error.requestFailed);
+                
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                switch (data.type) {
+                                    case 'status': {
+                                        // 更新主要状态显示
+                                        statusDiv.textContent = data.data;
+                                        appendProcessLine(data.data);
+                                        break;
+                                    }
+                                    case 'initial_answer_complete': {
+                                        const t_init = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        appendProcessLine(`${data.model_name} ${t_init.initialAnswerComplete}`);
+                                        appendDetailedBlock(`${data.model_name} ${t_init.initialAnswer}`, data.answer || '');
+                                        break;
+                                    }
+                                    case 'critique_complete': {
+                                        const t_crit = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        const critiqueData = data.critique_data || {};
+                                        const score = typeof critiqueData.score === 'number' ? critiqueData.score.toFixed(2) : (critiqueData.score || 'N/A');
+                                        appendProcessLine(`${data.critic_name} ${t_crit.critiqueComplete.replace('{target}', data.target_model).replace('{score}', score)}`);
+                                        if (evaluationMode === 'detailed') {
+                                            const metrics = `${t_crit.accuracy} ${critiqueData.accuracy ?? '-'} / ${t_crit.completeness} ${critiqueData.completeness ?? '-'} / ${t_crit.clarity} ${critiqueData.clarity ?? '-'} / ${t_crit.usefulness} ${critiqueData.usefulness ?? '-'}`;
+                                            const commentSource = critiqueData.comment || data.critique_text || '';
+                                            appendDetailedBlock(`${data.critic_name} ${t_crit.critiqueFor.replace('{target}', data.target_model)}`, commentSource, `${t_crit.totalScore} ${score} | ${metrics}`);
+                                        }
+                                        break;
+                                    }
+                                    case 'revision_complete': {
+                                        const t_rev = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        appendProcessLine(`${data.model_name} ${t_rev.revisionComplete}`);
+                                        appendDetailedBlock(`${data.model_name} ${t_rev.revisedAnswer}`, data.revised_answer || '');
+                                        break;
+                                    }
+                                    case 'final_result': {
+                                        const result = data.data || {};
+                                        const t_final = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        statusDiv.textContent = t_final.evaluationComplete;
+                                        statusDiv.style.borderLeftColor = 'var(--accent-purple)';
+                                        statusDiv.classList.add('completed');
+                                        appendProcessLine(t_final.finalAnswerGenerated);
+                                        
+                                        // 显示最终答案
+                                        const t_no_answer = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        finalAnswerDiv.textContent = result.best_answer || t_no_answer.noAnswerAvailable;
+                                        finalAnswerDiv.style.display = 'block';
+                                        
+                                        // 显示进度切换按钮
+                                        processToggle.style.display = 'inline-block';
+                                        
+                                        // 更新消息时间戳
+                                        aiMsg.setAttribute('data-timestamp', Date.now().toString());
+                                        
+                                        // 如果时间戳功能开启，添加或更新时间戳
+                                        if (S.get('sw_timestamps') === '1') {
+                                            let timeEl = aiMsg.querySelector('.message-timestamp');
+                                            if (!timeEl) {
+                                                timeEl = document.createElement('div');
+                                                timeEl.className = 'message-timestamp';
+                                                timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px;';
+                                                aiMsg.appendChild(timeEl);
+                                            }
+                                            const date = new Date();
+                                            const lang = window.currentLang || 'zh';
+                                            if (lang === 'en') {
+                                                timeEl.textContent = date.toLocaleString('en-US', { 
+                                                    month: 'short', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                });
+                                            } else {
+                                                timeEl.textContent = date.toLocaleString('zh-CN', { 
+                                                    month: 'numeric', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                });
+                                            }
+                                        }
+                                        
+                                        // 保存到历史记录
+                                        if (S.get('sw_auto-save') === '1') {
+                                            setTimeout(() => saveChatHistory(), 500);
+                                        }
+                                        
+                                        if (evaluationMode === 'detailed') {
+                                            // In detailed mode, the blocks are already appended by other events.
+                                            // This section is now redundant.
+                                        }
+                                        break;
+                                    }
+                                    case 'final': {
+                                        const t_final_single = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        statusDiv.textContent = t_final_single.answerGenerated;
+                                        statusDiv.style.borderLeftColor = 'var(--accent-purple)';
+                                        statusDiv.classList.add('completed');
+                                        appendProcessLine(t_final_single.finalAnswerGenerated);
+                                        
+                                        // 显示最终答案
+                                        const t_no_answer2 = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        finalAnswerDiv.textContent = data.data || t_no_answer2.noAnswerAvailable;
+                                        finalAnswerDiv.style.display = 'block';
+                                        
+                                        // 显示进度切换按钮
+                                        processToggle.style.display = 'inline-block';
+                                        
+                                        // 更新消息时间戳
+                                        aiMsg.setAttribute('data-timestamp', Date.now().toString());
+                                        
+                                        // 如果时间戳功能开启，添加或更新时间戳
+                                        if (S.get('sw_timestamps') === '1') {
+                                            let timeEl = aiMsg.querySelector('.message-timestamp');
+                                            if (!timeEl) {
+                                                timeEl = document.createElement('div');
+                                                timeEl.className = 'message-timestamp';
+                                                timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px;';
+                                                aiMsg.appendChild(timeEl);
+                                            }
+                                            const date = new Date();
+                                            const lang = window.currentLang || 'zh';
+                                            if (lang === 'en') {
+                                                timeEl.textContent = date.toLocaleString('en-US', { 
+                                                    month: 'short', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                });
+                                            } else {
+                                                timeEl.textContent = date.toLocaleString('zh-CN', { 
+                                                    month: 'numeric', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                });
+                                            }
+                                        }
+                                        
+                                        // 保存到历史记录（如果开启自动保存）
+                                        if (S.get('sw_auto-save') === '1') {
+                                            setTimeout(() => {
+                                                saveChatHistory();
+                                            }, 1000); // 延迟确保DOM更新完成
+                                        }
+                                        break;
+                                    }
+                                    case 'error': {
+                                        const t_err = i18n[window.currentLang || 'zh'] || i18n.zh;
+                                        statusDiv.textContent = t_err.processingFailed;
+                                        statusDiv.style.borderLeftColor = '#f87171';
+                                        statusDiv.style.color = '#f87171';
+                                        
+                                        finalAnswerDiv.textContent = `${t_err.processingFailed}: ${data.data}`;
+                                        finalAnswerDiv.style.color = '#f87171';
+                                        finalAnswerDiv.style.display = 'block';
+                                        appendProcessLine(t_err.evaluationTerminated);
+                                        break;
+                                    }
+                                    default:
+                                        break;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (e) {
+                const t_catch = i18n[window.currentLang || 'zh'] || i18n.zh;
+                statusDiv.textContent = t_catch.requestFailed;
+                statusDiv.style.borderLeftColor = '#f87171';
+                statusDiv.style.color = '#f87171';
+                
+                finalAnswerDiv.textContent = `${t_catch.requestFailed}: ${e.message}`;
+                finalAnswerDiv.style.color = '#f87171';
+                finalAnswerDiv.style.display = 'block';
+                appendProcessLine(t_catch.evaluationTerminated);
+            } finally {
+                questionInput.disabled = false;
+                questionInput.focus();
+            }
+        };
+        
+        // 回车发送
+        questionInput.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitBtn.click();
+            }
+        };
+        
+        // 选择图片
+        document.getElementById('select-image-btn').onclick = () => {
+            document.getElementById('image-input').click();
+        };
+        
+        document.getElementById('image-input').onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = document.createElement('img');
+                    img.src = ev.target.result;
+                    img.style.maxWidth = '200px';
+                    img.style.borderRadius = '8px';
+                    img.style.marginTop = '8px';
+                    
+                    const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'chat-message user';
+                    msgDiv.setAttribute('data-timestamp', Date.now().toString());
+                    msgDiv.innerHTML = `<div class="font-medium mb-1">${t.user}</div><div>${t.imageUploaded}</div>`;
+                    msgDiv.appendChild(img);
+                    
+                    // 如果时间戳功能开启，添加时间戳
+                    if (S.get('sw_timestamps') === '1') {
+                        const timeEl = document.createElement('div');
+                        timeEl.className = 'message-timestamp';
+                        timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px;';
+                        const date = new Date();
+                        const lang = window.currentLang || 'zh';
+                        if (lang === 'en') {
+                            timeEl.textContent = date.toLocaleString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            });
+                        } else {
+                            timeEl.textContent = date.toLocaleString('zh-CN', { 
+                                month: 'numeric', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            });
+                        }
+                        msgDiv.appendChild(timeEl);
+                    }
+                    
+                    document.getElementById('chat-log').appendChild(msgDiv);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        
+        // API调用函数
+        async function api(url, method = 'GET', data = null) {
+            const opts = { method, headers: {} };
+            if (data) {
+                opts.headers['Content-Type'] = 'application/json';
+                opts.body = JSON.stringify(data);
+            }
+            const resp = await fetch('/api' + url, opts);
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ detail: '请求失败' }));
+                throw new Error(err.detail || err.message || '请求失败');
+            }
+            return resp.json();
+        }
+        
+        // 加载服务商列表
+        async function loadProviders() {
+            try {
+                const providers = await api('/providers');
+                const container = document.getElementById('provider-list-settings');
+                container.innerHTML = providers.map(p => `
+                    <div class="provider-item-settings">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="font-medium text-blue-400">${p.name}</div>
+                                <div class="text-sm text-gray-400">(${p.type})</div>
+                            </div>
+                            <button class="btn-danger text-xs" onclick="deleteProvider('${p.name}')">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+                loadModelsForSidebar(providers);
+            } catch (e) {
+                console.error('加载服务商失败:', e);
+            }
+        }
+        
+        // 删除服务商
+        window.deleteProvider = async function(name) {
+            if (!confirm('确定删除 ' + name + '?')) return;
+            try {
+                await api('/providers/' + name, 'DELETE');
+                loadProviders();
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        };
+        
+        // 添加服务商
+        document.getElementById('add-provider-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                name: form.name.value.trim(),
+                type: form.type.value,
+                api_key: form.api_key.value.trim(),
+                api_base: form.api_base.value.trim() || null,
+                models: form.models.value.trim()
+            };
+            try {
+                await api('/providers', 'POST', data);
+                form.reset();
+                loadProviders();
+                alert('添加成功');
+            } catch (e) {
+                alert('添加失败: ' + e.message);
+            }
+        };
+        
+        // 加载模型列表到侧边栏
+        function loadModelsForSidebar(providers) {
+            const container = document.getElementById('model-list-sidebar');
+            const selected = JSON.parse(S.get('models', '[]'));
+            let html = '';
+            providers.forEach(p => {
+                p.models.split(',').forEach(m => {
+                    const modelName = m.trim();
+                    const key = `${p.name}::${modelName}`;
+                    const isActive = selected.includes(key);
+                    html += `
+                        <div class="sidebar-item ${isActive ? 'active' : ''}" onclick="toggleModel('${key}', this)">
+                            <span class="name">${p.name} - ${modelName}</span>
+                        </div>
+                    `;
+                });
+            });
+            container.innerHTML = html || '<div class="text-xs text-gray-400 p-2">无可用模型</div>';
+        }
+        
+        // 切换模型选择
+        window.toggleModel = function(key, element) {
+            const selected = JSON.parse(S.get('models', '[]'));
+            const index = selected.indexOf(key);
+            
+            if (index > -1) {
+                selected.splice(index, 1);
+                element.classList.remove('active');
+            } else {
+                selected.push(key);
+                element.classList.add('active');
+            }
+            S.set('models', JSON.stringify(selected));
+        };
+        
+        // 加载提示词列表
+        async function loadPrompts() {
+            try {
+                const prompts = await api('/prompts');
+                const settingsContainer = document.getElementById('prompt-list-settings');
+                const sidebarContainer = document.getElementById('prompt-list-sidebar');
+                
+                settingsContainer.innerHTML = prompts.map(p => `
+                    <div class="provider-item-settings">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="font-medium">${p.name_zh} / ${p.name_en}</div>
+                                ${p.is_active ? '<div class="text-sm text-green-400">✓ 当前使用</div>' : '<div class="text-sm text-gray-400">未激活</div>'}
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn-secondary text-xs" onclick="togglePromptDetail(${p.id})">
+                                    <span id="expand-icon-${p.id}">▼</span> 查看
+                                </button>
+                                ${!p.is_active ? `<button class="btn-success text-xs" onclick="activatePrompt(${p.id})">激活</button>` : ''}
+                                <button class="btn-danger text-xs" onclick="deletePrompt(${p.id})">删除</button>
+                            </div>
+                        </div>
+                        <div id="prompt-detail-${p.id}" class="hidden mt-3 text-sm" style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px;">
+                            <div class="mb-3">
+                                <div class="text-gray-400 mb-1">评审提示词 (中文):</div>
+                                <textarea id="critique-zh-${p.id}" class="w-full bg-gray-700 text-white p-2 rounded" rows="3">${p.critique_prompt_zh}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <div class="text-gray-400 mb-1">评审提示词 (英文):</div>
+                                <textarea id="critique-en-${p.id}" class="w-full bg-gray-700 text-white p-2 rounded" rows="3">${p.critique_prompt_en}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <div class="text-gray-400 mb-1">修订提示词 (中文):</div>
+                                <textarea id="revision-zh-${p.id}" class="w-full bg-gray-700 text-white p-2 rounded" rows="3">${p.revision_prompt_zh}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <div class="text-gray-400 mb-1">修订提示词 (英文):</div>
+                                <textarea id="revision-en-${p.id}" class="w-full bg-gray-700 text-white p-2 rounded" rows="3">${p.revision_prompt_en}</textarea>
+                            </div>
+                            <button class="btn-primary text-xs" onclick="updatePrompt(${p.id})">保存修改</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                sidebarContainer.innerHTML = prompts.map(p => `
+                    <div class="sidebar-item ${p.is_active ? 'active' : ''}" onclick="activatePrompt(${p.id}, true)">
+                        <span class="name">${p.name_zh}</span>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error('加载提示词失败:', e);
+            }
+        }
+        
+        // 展开/收起提示词详情
+        window.togglePromptDetail = function(id) {
+            const detail = document.getElementById(`prompt-detail-${id}`);
+            const icon = document.getElementById(`expand-icon-${id}`);
+            if (detail.classList.contains('hidden')) {
+                detail.classList.remove('hidden');
+                icon.textContent = '▲';
+            } else {
+                detail.classList.add('hidden');
+                icon.textContent = '▼';
+            }
+        };
+        
+        // 更新提示词
+        window.updatePrompt = async function(id) {
+            try {
+                const data = {
+                    critique_prompt_zh: document.getElementById(`critique-zh-${id}`).value,
+                    critique_prompt_en: document.getElementById(`critique-en-${id}`).value,
+                    revision_prompt_zh: document.getElementById(`revision-zh-${id}`).value,
+                    revision_prompt_en: document.getElementById(`revision-en-${id}`).value
+                };
+                await api(`/prompts/${id}`, 'PUT', data);
+                alert('更新成功');
+                loadPrompts();
+            } catch (e) {
+                alert('更新失败: ' + e.message);
+            }
+        };
+        
+        // 激活提示词
+        window.activatePrompt = async function(id, fromSidebar = false) {
+            try {
+                await api(`/prompts/${id}/activate`, 'POST');
+                if (!fromSidebar) {
+                    alert('激活成功');
+                }
+                loadPrompts();
+            } catch (e) {
+                alert('激活失败: ' + e.message);
+            }
+        };
+        
+        // 删除提示词
+        window.deletePrompt = async function(id) {
+            if (!confirm('确定删除此提示词?')) return;
+            try {
+                await api(`/prompts/${id}`, 'DELETE');
+                loadPrompts();
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        };
+        
+        // 添加提示词
+        document.getElementById('add-prompt-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                name_zh: form.name_zh.value.trim(),
+                name_en: form.name_en.value.trim(),
+                critique_prompt_zh: form.critique_zh.value.trim(),
+                critique_prompt_en: form.critique_en.value.trim(),
+                revision_prompt_zh: form.revision_zh.value.trim(),
+                revision_prompt_en: form.revision_en.value.trim()
+            };
+            try {
+                await api('/prompts', 'POST', data);
+                form.reset();
+                loadPrompts();
+                alert('添加成功');
+            } catch (e) {
+                alert('添加失败: ' + e.message);
+            }
+        };
+
+        // 历史记录功能
+        function saveChatHistory() {
+            try {
+                const chatLog = document.getElementById('chat-log');
+                if (!chatLog) return;
+                
+                const messages = [];
+                
+                chatLog.querySelectorAll('.chat-message').forEach(msg => {
+                    const isUser = msg.classList.contains('user');
+                    let contentEl = null;
+                    
+                    if (isUser) {
+                        // 用户消息：获取最后一个div（内容）
+                        const divs = msg.querySelectorAll('div');
+                        if (divs.length > 1) {
+                            contentEl = divs[divs.length - 1];
+                        }
+                    } else {
+                        // AI消息：尝试多个可能的选择器
+                        contentEl = msg.querySelector('.response-content') || 
+                                   msg.querySelector('.final-answer') || 
+                                   msg.querySelector('.process-text') ||
+                                   (() => {
+                                       const divs = msg.querySelectorAll('div');
+                                       return divs.length > 1 ? divs[divs.length - 1] : null;
+                                   })();
+                    }
+                    
+                    if (contentEl) {
+                        const content = contentEl.textContent.trim();
+                        // 跳过空内容和状态消息
+                        if (content && !content.startsWith('✓') && !content.startsWith('❌') && 
+                            !content.includes('正在初始化') && !content.includes('正在') && 
+                            content.length > 3) {
+                            const timestamp = msg.getAttribute('data-timestamp') || Date.now().toString();
+                            messages.push({
+                                type: isUser ? 'user' : 'assistant',
+                                content: content,
+                                timestamp: timestamp
+                            });
+                        }
+                    }
+                });
+                
+                if (messages.length >= 2) { // 至少需要一问一答
+                    const historyKey = 'chat_history_' + Date.now();
+                    const firstUserMsg = messages.find(m => m.type === 'user');
+                    const title = firstUserMsg ? (firstUserMsg.content.substring(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '')) : '对话记录';
+                    
+                    const historyItem = {
+                        id: historyKey,
+                        title: title,
+                        messages: messages,
+                        createdAt: Date.now()
+                    };
+                    
+                    let allHistory = JSON.parse(S.get('all_chat_history', '[]'));
+                    // 检查是否已存在相同的对话（避免重复保存）
+                    const isDuplicate = allHistory.some(h => {
+                        if (h.messages.length !== messages.length) return false;
+                        return h.messages.every((m, i) => 
+                            m.type === messages[i].type && m.content === messages[i].content
+                        );
+                    });
+                    
+                    if (!isDuplicate) {
+                        allHistory.unshift(historyItem);
+                        // 只保留最近50条
+                        if (allHistory.length > 50) {
+                            allHistory = allHistory.slice(0, 50);
+                        }
+                        S.set('all_chat_history', JSON.stringify(allHistory));
+                        console.log('历史记录已保存，共', messages.length, '条消息');
+                    }
+                }
+            } catch (e) {
+                console.error('保存历史记录失败:', e);
+            }
+        }
+        
+        function loadChatHistory() {
+            try {
+                const historyContainer = document.getElementById('chat-history');
+                if (!historyContainer) {
+                    console.error('历史记录容器不存在');
+                    return;
+                }
+                
+                let allHistory = [];
+                try {
+                    const historyStr = S.get('all_chat_history', '[]');
+                    allHistory = JSON.parse(historyStr);
+                } catch (e) {
+                    console.error('解析历史记录失败:', e);
+                    allHistory = [];
+                }
+                
+                if (!Array.isArray(allHistory) || allHistory.length === 0) {
+                    const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+                    historyContainer.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">${t.noHistory}</div>`;
+                    return;
+                }
+                
+                const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+                historyContainer.innerHTML = allHistory.map(item => {
+                    const date = new Date(item.createdAt || Date.now());
+                    const dateStr = date.toLocaleString(window.currentLang === 'en' ? 'en-US' : 'zh-CN', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    return `
+                        <div class="history-item p-2 hover:bg-gray-800 rounded cursor-pointer mb-1" data-id="${item.id || 'unknown'}">
+                            <div class="text-sm text-gray-200 truncate">${item.title || '未命名对话'}</div>
+                            <div class="text-xs text-gray-500 mt-1">${dateStr}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // 绑定点击事件
+                historyContainer.querySelectorAll('.history-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const id = item.getAttribute('data-id');
+                        const historyItem = allHistory.find(h => h.id === id);
+                        if (historyItem && historyPopup) {
+                            loadHistoryToChat(historyItem);
+                            historyPopup.classList.add('hidden');
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error('加载历史记录失败:', e);
+                const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+                const historyContainer = document.getElementById('chat-history');
+                if (historyContainer) {
+                    historyContainer.innerHTML = `<div class="text-sm text-red-400 text-center py-4">加载失败</div>`;
+                }
+            }
+        }
+        
+        function loadHistoryToChat(historyItem) {
+            const chatLog = document.getElementById('chat-log');
+            chatLog.innerHTML = '';
+            
+            const t = i18n[window.currentLang || 'zh'] || i18n.zh;
+            historyItem.messages.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `chat-message ${msg.type}`;
+                msgDiv.setAttribute('data-timestamp', msg.timestamp);
+                
+                if (msg.type === 'user') {
+                    msgDiv.innerHTML = `<div class="font-medium mb-1">${t.user}</div><div>${msg.content}</div>`;
+                } else {
+                    msgDiv.innerHTML = `<div class="font-medium mb-1 text-purple-400">${t.aiAssistant}</div><div class="response-content">${msg.content}</div>`;
+                }
+                
+                // 如果时间戳功能开启，添加时间戳
+                if (S.get('sw_timestamps') === '1') {
+                    const timeEl = document.createElement('div');
+                    timeEl.className = 'message-timestamp';
+                    timeEl.style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 4px;';
+                    const date = new Date(parseInt(msg.timestamp));
+                    const lang = window.currentLang || 'zh';
+                    if (lang === 'en') {
+                        timeEl.textContent = date.toLocaleString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                    } else {
+                        timeEl.textContent = date.toLocaleString('zh-CN', { 
+                            month: 'numeric', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                    }
+                    msgDiv.appendChild(timeEl);
+                }
+                
+                chatLog.appendChild(msgDiv);
+            });
+            
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        
+        // 历史记录弹窗
+        const historyBtn = document.getElementById('history-btn');
+        const historyPopup = document.getElementById('history-popup');
+        if (historyBtn && historyPopup) {
+            historyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                loadChatHistory();
+                historyPopup.classList.toggle('hidden');
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (!historyPopup.contains(e.target) && !historyBtn.contains(e.target)) {
+                historyPopup.classList.add('hidden');
+            }
+        });
+
+        // 手风琴效果
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                header.classList.toggle('active');
+                if (content.style.maxHeight) {
+                    content.style.maxHeight = null;
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                }
+            });
+        });
+
+        // 跳转到设置页面
+        document.getElementById('manage-providers-btn').onclick = () => {
+            settingsModal.classList.add('active');
+            document.querySelector('.settings-nav-item[data-section="models"]').click();
+        };
+        document.getElementById('manage-prompts-btn').onclick = () => {
+            settingsModal.classList.add('active');
+            document.querySelector('.settings-nav-item[data-section="prompts"]').click();
+        };
+        
+        // ==================== 壁纸功能 ====================
+        const wallpaperStatus = document.getElementById('wallpaper-status');
+        function setWallpaperStatus(message, isError = false) {
+            if (!wallpaperStatus) return;
+            wallpaperStatus.textContent = message || '';
+            wallpaperStatus.style.color = isError ? '#f87171' : '#9ca3af';
+        }
+
+        // 应用背景图片
+        function applyBgImage() {
+            const bgImage = S.get('bgImage');
+            const opacity = S.get('bgOpacity', '100');
+            const brightness = S.get('bgBrightness', '100');
+            // 强制确保模糊值为0，如果用户之前设置过非0值，也重置为0
+            let blur = parseInt(S.get('bgBlur', '0')) || 0;
+            if (blur > 0) {
+                // 如果发现有模糊值，重置为0并保存
+                blur = 0;
+                S.set('bgBlur', '0');
+                // 更新滑块显示
+                const blurSlider = document.getElementById('wallpaper-blur');
+                const blurLabel = document.getElementById('wallpaper-blur-label');
+                if (blurSlider) blurSlider.value = 0;
+                if (blurLabel) blurLabel.textContent = '0px';
+            }
+            
+            // 更新 CSS 样式 - 移除所有可能冲突的样式（包括script.js添加的）
+            const styleIds = ['bg-filter-style', 'wallpaper-style'];
+            styleIds.forEach(id => {
+                const existingStyle = document.getElementById(id);
+                if (existingStyle) {
+                    existingStyle.remove();
+                    console.log(`[壁纸] 已移除旧样式: ${id}`);
+                }
+            });
+            
+            const style = document.createElement('style');
+            style.id = 'bg-filter-style';
+            
+            if (bgImage) {
+                // 根据当前主题计算叠加层颜色
+                // 降低叠加层透明度，让壁纸更清晰（当透明度为100%时，叠加层完全透明）
+                const isDark = document.documentElement.classList.contains('dark');
+                const baseOverlayColor = isDark ? '26,29,35' : '247,250,252';
+                // 确保透明度为100%时叠加层完全透明，降低叠加层影响
+                const overlayOpacity = opacity >= 100 ? 0 : Math.max(0, (1 - (opacity / 100)) * 0.3);
+                const overlayColor = `rgba(${baseOverlayColor},${overlayOpacity})`;
+                
+                // 添加has-wallpaper类到html和body，使背景透明
+                document.documentElement.classList.add('has-wallpaper');
+                document.body.classList.add('has-wallpaper');
+                
+                // 将背景图片设置在 body::before 上，并应用滤镜
+                // 使用转义来安全处理base64数据
+                const safeBgImage = bgImage.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                
+                style.textContent = `
+                    body.has-wallpaper::before {
+                        content: '' !important;
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        bottom: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        background-image: url('${safeBgImage}') !important;
+                        background-size: cover !important;
+                        background-position: center center !important;
+                        background-attachment: fixed !important;
+                        background-repeat: no-repeat !important;
+                        filter: brightness(${brightness}%) !important;
+                        opacity: 1 !important;
+                        display: block !important;
+                        visibility: visible !important;
+                        z-index: -2 !important;
+                        pointer-events: none !important;
+                    }
+                    html.has-wallpaper,
+                    body.has-wallpaper {
+                        background: transparent !important;
+                        background-image: none !important;
+                    }
+                    body.has-wallpaper::after {
+                        content: '' !important;
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        bottom: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        background: ${overlayColor} !important;
+                        z-index: -1 !important;
+                        pointer-events: none !important;
+                        display: block !important;
+                    }
+                    
+                    /* 确保侧边栏和主内容区在有壁纸时保持适度不透明以确保文字清晰 */
+                    body.has-wallpaper .sidebar {
+                        background: rgba(37, 41, 50, 0.85) !important;
+                        backdrop-filter: blur(10px) !important;
+                    }
+                    
+                    body.has-wallpaper .main-content {
+                        background: rgba(26, 29, 35, 0.85) !important;
+                        backdrop-filter: blur(10px) !important;
+                    }
+                    
+                    html:not(.dark) body.has-wallpaper .sidebar {
+                        background: rgba(237, 242, 247, 0.92) !important;
+                    }
+                    
+                    html:not(.dark) body.has-wallpaper .main-content {
+                        background: rgba(247, 250, 252, 0.92) !important;
+                    }
+                    
+                    /* 有壁纸时，输入区域也使用适度不透明以确保文字清晰 */
+                    body.has-wallpaper .input-area {
+                        background: rgba(37, 41, 50, 0.85) !important;
+                        backdrop-filter: blur(10px) !important;
+                        border-top: 1px solid rgba(74, 85, 104, 0.5) !important;
+                    }
+                    
+                    body.has-wallpaper .input-container {
+                        background: rgba(50, 58, 70, 0.9) !important;
+                        backdrop-filter: blur(5px) !important;
+                        border: 1px solid rgba(58, 69, 83, 0.6) !important;
+                    }
+                    
+                    html:not(.dark) body.has-wallpaper .input-area {
+                        background: rgba(237, 242, 247, 0.92) !important;
+                        border-top: 1px solid rgba(203, 213, 224, 0.5) !important;
+                    }
+                    
+                    html:not(.dark) body.has-wallpaper .input-container {
+                        background: rgba(255, 255, 255, 0.95) !important;
+                        border: 1px solid rgba(226, 232, 240, 0.6) !important;
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                // 强制重新渲染和验证
+                requestAnimationFrame(() => {
+                    // 触发重排以确保样式应用
+                    void document.body.offsetHeight;
+                    void document.documentElement.offsetHeight;
+                    
+                    // 延迟检查，确保样式完全应用
+                    setTimeout(() => {
+                        const testStyle = window.getComputedStyle(document.body, '::before');
+                        const bgImgValue = testStyle.backgroundImage;
+                        const opacityValue = testStyle.opacity;
+                        const displayValue = testStyle.display;
+                        const zIndexValue = testStyle.zIndex;
+                        
+                        console.log('[壁纸] 应用完成，长度:', bgImage.length);
+                        console.log('[壁纸] computed background-image:', bgImgValue ? bgImgValue.substring(0, 100) : 'none');
+                        console.log('[壁纸] computed opacity:', opacityValue);
+                        console.log('[壁纸] computed display:', displayValue);
+                        console.log('[壁纸] computed z-index:', zIndexValue);
+                        console.log('[壁纸] html.has-wallpaper:', document.documentElement.classList.contains('has-wallpaper'));
+                        console.log('[壁纸] body.has-wallpaper:', document.body.classList.contains('has-wallpaper'));
+                        console.log('[壁纸] 叠加层颜色:', overlayColor);
+                        console.log('[壁纸] 亮度:', brightness + '%, 模糊:', blur + 'px');
+                        
+                        if (bgImgValue && bgImgValue !== 'none' && bgImgValue.includes('url')) {
+                            console.log('✓ 背景图片已成功应用到 body::before');
+                            
+                            // 验证侧边栏和主内容区的透明度
+                            const sidebarEl = document.querySelector('.sidebar');
+                            const mainContentEl = document.querySelector('.main-content');
+                            if (sidebarEl) {
+                                const sidebarStyle = window.getComputedStyle(sidebarEl);
+                                console.log('[壁纸] 侧边栏背景:', sidebarStyle.background);
+                            }
+                            if (mainContentEl) {
+                                const mainStyle = window.getComputedStyle(mainContentEl);
+                                console.log('[壁纸] 主内容区背景:', mainStyle.background);
+                            }
+                        } else {
+                            console.error('❌ 背景图片未正确应用！computed:', bgImgValue);
+                            console.error('[壁纸] 请检查CSS选择器是否正确匹配');
+                            
+                            // 尝试强制刷新
+                            document.body.style.display = 'none';
+                            void document.body.offsetHeight;
+                            document.body.style.display = '';
+                        }
+                    }, 100);
+                });
+            } else {
+                // 清除背景图片
+                document.documentElement.classList.remove('has-wallpaper');
+                document.body.classList.remove('has-wallpaper');
+                
+                style.textContent = `
+                    body::before {
+                        background-image: none !important;
+                        filter: none !important;
+                    }
+                    body::after {
+                        background: transparent !important;
+                    }
+                `;
+                document.head.appendChild(style);
+                console.log('[壁纸] 壁纸已清除');
+            }
+            
+            // 确保我们的函数覆盖script.js中的函数（如果存在）
+            if (typeof window !== 'undefined') {
+                window.applyBgImage = applyBgImage;
+            }
+        }
+        
+        // 上传壁纸 - 使用更安全的事件绑定方式，确保不被script.js覆盖
+        function setupWallpaperUpload() {
+            const uploadBtn = document.getElementById('wallpaper-upload-btn');
+            const uploadInput = document.getElementById('wallpaper-upload');
+            
+            if (!uploadBtn || !uploadInput) {
+                console.warn('壁纸上传元素不存在，延迟重试...');
+                setTimeout(setupWallpaperUpload, 500);
+                return;
+            }
+            
+            // 先移除所有旧的事件监听器（包括script.js添加的）
+            uploadBtn.onclick = null;
+            uploadInput.onchange = null;
+            
+            // 使用 addEventListener 并设置高优先级
+            uploadBtn.addEventListener('click', function handleUploadClick(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                console.log('[壁纸] 点击上传按钮');
+                uploadInput.click();
+            }, true); // 使用捕获阶段，优先级更高
+            
+            uploadInput.addEventListener('change', function handleUploadChange(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                const file = e.target.files[0];
+                if (!file) {
+                    console.log('[壁纸] 未选择文件');
+                    return;
+                }
+
+                console.log('[壁纸] 选择的文件:', file.name, '大小:', file.size, '类型:', file.type);
+
+                const t_wall = i18n[window.currentLang || 'zh'] || i18n.zh;
+                if (file.size > 4 * 1024 * 1024) {
+                    setWallpaperStatus(t_wall.wallpaperSizeError, true);
+                    e.target.value = '';
+                    return;
+                }
+
+                if (!file.type.startsWith('image/')) {
+                    setWallpaperStatus('请选择图片文件', true);
+                    e.target.value = '';
+                    return;
+                }
+
+                setWallpaperStatus(t_wall.uploadingWallpaper);
+                
+                const reader = new FileReader();
+                reader.onerror = (err) => {
+                    console.error('[壁纸] 文件读取错误:', err);
+                    const t_wall_err = i18n[window.currentLang || 'zh'] || i18n.zh;
+                    setWallpaperStatus(t_wall_err.wallpaperFileError, true);
+                };
+                reader.onload = (ev) => {
+                    try {
+                        const imageData = ev.target.result;
+                        console.log('[壁纸] 图片数据已读取，长度:', imageData.length);
+                        
+                        // 验证是否是有效的base64图片数据
+                        if (!imageData || !imageData.startsWith('data:image/')) {
+                            throw new Error('无效的图片格式');
+                        }
+                        
+                        S.set('bgImage', imageData);
+                        console.log('[壁纸] 图片已保存到localStorage，键: bgImage');
+                        
+                        // 立即应用背景
+                        applyBgImage();
+                        
+                        // 再次应用以确保生效（延迟确保DOM更新）
+                        setTimeout(() => {
+                            applyBgImage();
+                        }, 200);
+                        
+                        const t_wall_ok = i18n[window.currentLang || 'zh'] || i18n.zh;
+                        setWallpaperStatus(t_wall_ok.wallpaperUpdated);
+                        console.log('[壁纸] 壁纸应用完成');
+                    } catch (err) {
+                        console.error('[壁纸] 保存壁纸失败', err);
+                        const t_wall_err2 = i18n[window.currentLang || 'zh'] || i18n.zh;
+                        setWallpaperStatus(t_wall_err2.wallpaperError + ': ' + err.message, true);
+                    }
+                };
+                reader.readAsDataURL(file);
+            }, true); // 使用捕获阶段，优先级更高
+            
+            console.log('[壁纸] 壁纸上传事件已绑定（高优先级）');
+        }
+        
+        // 延迟设置，确保在script.js之后执行
+        function initWallpaperUpload() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    setTimeout(setupWallpaperUpload, 1000); // 延迟1秒，确保script.js先执行完
+                });
+            } else {
+                setTimeout(setupWallpaperUpload, 1000); // 延迟1秒
+            }
+        }
+        initWallpaperUpload();
+        
+        // 重置壁纸
+        document.getElementById('reset-wallpaper-btn').onclick = () => {
+            const t_wall_reset = i18n[window.currentLang || 'zh'] || i18n.zh;
+            if (confirm(t_wall_reset.confirmResetWallpaper)) {
+                S.set('bgImage', '');
+                S.set('bgOpacity', '100');
+                S.set('bgBrightness', '100');
+                S.set('bgBlur', '0');
+                document.getElementById('wallpaper-opacity').value = 100;
+                document.getElementById('wallpaper-brightness').value = 100;
+                document.getElementById('wallpaper-blur').value = 0;
+                document.getElementById('wallpaper-opacity-label').textContent = '100%';
+                document.getElementById('wallpaper-brightness-label').textContent = '100%';
+                document.getElementById('wallpaper-blur-label').textContent = '0px';
+                applyBgImage();
+                setWallpaperStatus(t_wall_reset.wallpaperReset);
+            }
+        };
+        
+        // 透明度滑块
+        const opacitySlider = document.getElementById('wallpaper-opacity');
+        const opacityLabel = document.getElementById('wallpaper-opacity-label');
+        opacitySlider.value = S.get('bgOpacity', '100');
+        opacityLabel.textContent = opacitySlider.value + '%';
+        
+        opacitySlider.oninput = (e) => {
+            const value = e.target.value;
+            opacityLabel.textContent = value + '%';
+            S.set('bgOpacity', value);
+            applyBgImage();
+        };
+        
+        // 亮度滑块
+        const brightnessSlider = document.getElementById('wallpaper-brightness');
+        const brightnessLabel = document.getElementById('wallpaper-brightness-label');
+        brightnessSlider.value = S.get('bgBrightness', '100');
+        brightnessLabel.textContent = brightnessSlider.value + '%';
+        
+        brightnessSlider.oninput = (e) => {
+            const value = e.target.value;
+            brightnessLabel.textContent = value + '%';
+            S.set('bgBrightness', value);
+            applyBgImage();
+        };
+        
+        // 模糊滑块
+        const blurSlider = document.getElementById('wallpaper-blur');
+        const blurLabel = document.getElementById('wallpaper-blur-label');
+        blurSlider.value = S.get('bgBlur', '0');
+        blurLabel.textContent = blurSlider.value + 'px';
+        
+        blurSlider.oninput = (e) => {
+            const value = e.target.value;
+            blurLabel.textContent = value + 'px';
+            S.set('bgBlur', value);
+            applyBgImage();
+        };
+        
+        // 初始化壁纸 - 延迟执行确保在script.js之后
+        setTimeout(() => {
+            applyBgImage();
+            const t_wall_init = i18n[window.currentLang || 'zh'] || i18n.zh;
+            setWallpaperStatus(S.get('bgImage') ? t_wall_init.wallpaperSaved : t_wall_init.wallpaperDefault);
+        }, 1500);
+        // ==================== 壁纸功能结束 ====================
+        
+        // 初始化加载
+        loadProviders();
+        loadPrompts();
+    </script>
 </body>
 </html>
-

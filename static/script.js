@@ -424,6 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
     const themeToggle = document.getElementById('theme-toggle');
+    const themeToggleSettings = document.getElementById('theme-toggle-settings');
     const themeIconSun = document.getElementById('theme-icon-sun');
     const themeIconMoon = document.getElementById('theme-icon-moon');
     const themeText = document.getElementById('theme-text');
@@ -837,7 +838,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     await loadAndRenderAll();
                 } catch (error) {
                     log.error(`Delete error: ${error}`);
-                    notification.error(`错误: ${error.message}`);
+                    let errorMsg = error.message;
+                    try {
+                        const parsed = JSON.parse(errorMsg);
+                        if(parsed && parsed.detail) errorMsg = parsed.detail;
+                    } catch(e) { /* not a json string */ }
+                    notification.error(`错误: ${errorMsg}`);
                 }
             });
             
@@ -878,7 +884,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     await loadAndRenderAll();
                 } catch (error) {
                     log.error(`Update error: ${error}`);
-                    notification.error(`错误: ${error.message}`);
+                    let errorMsg = error.message;
+                    try {
+                        const parsed = JSON.parse(errorMsg);
+                        if(parsed && parsed.detail) errorMsg = parsed.detail;
+                    } catch(e) { /* not a json string */ }
+                    notification.error(`错误: ${errorMsg}`);
                 } finally {
                     submitButton.textContent = originalText;
                     submitButton.disabled = false;
@@ -1040,7 +1051,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         isRecognizing = true;
-        log.info(`使用OCR模型: ${ocrModel}`);
+        log.info(`🔍 开始OCR识别，使用模型: ${ocrModel}`);
+        log.info(`📁 待识别文件数: ${files.length}`);
         
         let recognizedText = '';
         let successCount = 0;
@@ -1049,41 +1061,59 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
+                log.info(`📸 正在识别第 ${i + 1}/${files.length} 张: ${file.name}`);
+                
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
                     formData.append('ocr_model', ocrModel);
+                    
+                    log.info(`🌐 发送OCR请求: ${API_BASE_URL}/api/ocr`);
+                    log.info(`📦 FormData - file: ${file.name}, ocr_model: ${ocrModel}`);
                     
                     const response = await fetch(`${API_BASE_URL}/api/ocr`, {
                         method: 'POST',
                         body: formData
                     });
                     
+                    log.info(`📡 OCR响应状态: ${response.status} ${response.statusText}`);
+                    
                     if (response.ok) {
                         const data = await response.json();
+                        log.info(`📄 OCR返回数据:`, data);
+                        
                         if (data.ocr_text) {
-                            recognizedText += `\n--- ${file.name} ---\n${data.ocr_text}\n`;
+                            const ocrContent = data.ocr_text.trim();
+                            recognizedText += `\n--- ${file.name} ---\n${ocrContent}\n`;
                             successCount++;
-                            log.info(`图片 ${file.name} 识别成功`);
+                            log.info(`✅ 图片 ${file.name} 识别成功，内容长度: ${ocrContent.length} 字符`);
+                            log.info(`📝 识别内容预览: ${ocrContent.substring(0, 100)}...`);
+                        } else {
+                            log.warn(`⚠️ 图片 ${file.name} OCR返回空内容`);
                         }
                     } else {
-                        log.warn(`图片 ${file.name} 识别失败`);
+                        const errorText = await response.text();
+                        log.error(`❌ 图片 ${file.name} 识别失败: ${response.status} - ${errorText}`);
                     }
                 } catch (error) {
-                    log.error(`图片 ${file.name} 识别异常: ${error}`);
+                    log.error(`❌ 图片 ${file.name} 识别异常:`, error);
                 }
             }
             
-            // 将识别的文字设置为待处理的OCR文本，供后续问题处理使用
+            // ⚠️ 重要：清空之前的OCR文本，使用新识别的内容
             if (recognizedText) {
                 pendingOcrText = recognizedText.trim();
+                log.info(`✅ OCR识别完成，设置 pendingOcrText，总长度: ${pendingOcrText.length} 字符`);
+                log.info(`📝 完整OCR内容:\n${pendingOcrText}`);
                 notification.success(`成功识别 ${successCount}/${files.length} 张图片的文字，将在下次提问时使用`);
             } else {
                 pendingOcrText = null;
+                log.warn(`⚠️ 未识别到任何文字内容，清空 pendingOcrText`);
                 notification.warning('未能识别到文字内容');
             }
         } finally {
             isRecognizing = false;
+            log.info(`🏁 OCR识别流程结束`);
         }
     }
     
@@ -1166,7 +1196,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 await loadAndRenderAll();
             } catch (error) {
                 log.error(`Add provider error: ${error}`);
-                notification.error(`错误: ${error.message}`);
+                let errorMsg = error.message;
+                try {
+                    const parsed = JSON.parse(errorMsg);
+                    if(parsed && parsed.detail) errorMsg = parsed.detail;
+                } catch(e) { /* not a json string */ }
+                notification.error(`错误: ${errorMsg}`);
             } finally {
                 submitButton.textContent = originalText;
                 submitButton.disabled = false;
@@ -1255,15 +1290,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function processQuery(question, selectedModels, assistantBubble, userBubble) {
+            console.log('=== [processQuery] 发送请求信息 ===');
+            console.log('[processQuery] question:', question);
+            console.log('[processQuery] selectedModels:', selectedModels);
+            console.log('[processQuery] pendingOcrText 长度:', pendingOcrText ? pendingOcrText.length : 'null');
+            console.log('[processQuery] pendingOcrText 内容:', pendingOcrText ? pendingOcrText.substring(0, 200) : 'null');
+            
+            const requestBody = {
+                question: question,
+                selected_models: selectedModels,
+                history: conversationHistory.slice(0, -1),
+                ocr_text: pendingOcrText || null
+            };
+            console.log('[processQuery] 完整请求体:', JSON.stringify(requestBody, null, 2));
+            
             const response = await fetch(`${API_BASE_URL}/api/process`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    selected_models: selectedModels,
-                    history: conversationHistory.slice(0, -1),
-                    ocr_text: pendingOcrText || null
-                })
+                body: JSON.stringify(requestBody)
             });
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1379,7 +1423,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentReader = null;
             toggleLoading(false);
             chatLog.scrollTop = chatLog.scrollHeight;
-            pendingOcrText = null;
+            // 修复：在提交后清除所有文件和OCR文本
+            clearFileSelection();
     }
     
     // === 渲染详情 ===
@@ -1450,43 +1495,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // ===== 壁纸核心逻辑 =====
-    function setWallpaper(url, opacity, brightness) {
-        const el = document.querySelector('main');
-        if (!el) return;
-        if (url) {
-            el.style.backgroundImage = `url('${url}')`;
-            el.style.backgroundSize = 'cover';
-            el.style.backgroundPosition = 'center';
-            el.style.backgroundRepeat = 'no-repeat';
-            el.style.filter = `opacity(${opacity}) brightness(${brightness})`;
-        } else {
-            el.style.backgroundImage = '';
-            el.style.filter = '';
-        }
-    }
-    function loadWallpaperSetting() {
-        let wp = localStorage.getItem('custom_wallpaper_data');
-        let opacity = parseFloat(localStorage.getItem('custom_wallpaper_opacity') || '1');
-        let brightness = parseFloat(localStorage.getItem('custom_wallpaper_brightness') || '1');
-        setWallpaper(wp, opacity, brightness);
-        // 恢复滑块
-        const opaSlider = document.getElementById('wallpaper-opacity');
-        const brightSlider = document.getElementById('wallpaper-brightness');
-        if (opaSlider) {
-          opaSlider.value = Math.round(opacity * 100);
-          document.getElementById('wallpaper-opacity-label').textContent = `${opaSlider.value}%`;
-        }
-        if (brightSlider) {
-          brightSlider.value = Math.round(brightness * 100);
-          document.getElementById('wallpaper-brightness-label').textContent = `${brightSlider.value}%`;
-        }
-    }
-    const wallpaperInput = document.getElementById('wallpaper-upload');
-    const wallpaperUploadBtn = document.getElementById('wallpaper-upload-btn');
-    const opacitySlider = document.getElementById('wallpaper-opacity');
-    const brightnessSlider = document.getElementById('wallpaper-brightness');
-    const resetWallpaperBtn = document.getElementById('wallpaper-reset-btn');
+    // ===== 壁纸功能由 index.html 中的内联脚本处理 =====
+    // 移除了冲突的 setWallpaper() 和 loadWallpaperSetting() 函数
     // 图片选择元素
     const bulkImageInput = document.getElementById('bulk-image-input');
     // OCR模型选择
@@ -1664,8 +1674,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        // ⚠️ Bug修复：不再清空之前的文件，实现多次追加
+        // accumulatedFiles = [];
+        // pendingOcrText = null;
+        // log.info('🔄 清空之前的文件，准备添加新文件');
+        
         console.log('[DEBUG addFilesToAccumulated] 添加前accumulatedFiles数量:', accumulatedFiles.length);
-        console.log('[DEBUG addFilesToAccumulated] 添加前accumulatedFiles内容:', accumulatedFiles.map(f => f.name));
         
         const fileArray = Array.from(files);
         console.log('[DEBUG addFilesToAccumulated] fileArray:', fileArray.map(f => f.name));
@@ -1674,18 +1688,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const newFiles = [];
         fileArray.forEach(newFile => {
             console.log(`[DEBUG addFilesToAccumulated] 处理文件: ${newFile.name}, 大小: ${newFile.size}`);
-            // 检查是否已存在相同文件（根据名称和大小）
-            const exists = accumulatedFiles.some(f => 
-                f.name === newFile.name && f.size === newFile.size
-            );
-            console.log(`[DEBUG addFilesToAccumulated] ${newFile.name} 是否已存在: ${exists}`);
-            if (!exists) {
+            // 检查重复
+            if (!accumulatedFiles.some(existingFile => existingFile.name === newFile.name && existingFile.size === newFile.size)) {
                 accumulatedFiles.push(newFile);
                 newFiles.push(newFile);
                 actuallyAdded++;
                 console.log(`[DEBUG addFilesToAccumulated] ✓ 已添加: ${newFile.name}`);
             } else {
-                console.log(`[DEBUG addFilesToAccumulated] ✗ 跳过重复: ${newFile.name}`);
+                console.log(`[DEBUG addFilesToAccumulated] ✗ 已跳过重复文件: ${newFile.name}`);
             }
         });
         
@@ -1699,7 +1709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const addedCount = actuallyAdded;
         const totalCount = accumulatedFiles.length;
         console.log(`[DEBUG addFilesToAccumulated] 显示通知: 已添加 ${addedCount} 张，当前共 ${totalCount} 张`);
-        notification.info(`已添加 ${addedCount} 张图片，当前共 ${totalCount} 张`);
+        notification.info(`已选择 ${totalCount} 张图片，即将开始识别`);
         
         // 自动识别新添加的图片
         if (newFiles.length > 0) {
@@ -1719,10 +1729,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 清除所有累积的文件选择
     function clearFileSelection() {
         accumulatedFiles = [];
+        pendingOcrText = null;  // ⚠️ 清空OCR缓存
         if (bulkImageInput) {
             bulkImageInput.value = '';
         }
         displaySelectedFiles();
+        log.info('🗑️ 已清除所有文件和OCR缓存');
         notification.info('已清除所有待识别图片');
     }
     
@@ -1737,46 +1749,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if(wallpaperUploadBtn && wallpaperInput) {
-      wallpaperUploadBtn.onclick = function() {
-        const file = wallpaperInput.files && wallpaperInput.files[0];
-        if (!file) { notification.warning('请先选择图片'); return; }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const dataUrl = e.target.result;
-          localStorage.setItem('custom_wallpaper_data', dataUrl);
-          setWallpaper(dataUrl, (opacitySlider ? opacitySlider.value/100 : 1), (brightnessSlider ? brightnessSlider.value/100 : 1));
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-    if(opacitySlider) {
-      opacitySlider.oninput = function() {
-        const val = (opacitySlider.value/100).toFixed(2);
-        document.getElementById('wallpaper-opacity-label').textContent = `${opacitySlider.value}%`;
-        localStorage.setItem('custom_wallpaper_opacity', val);
-        setWallpaper(localStorage.getItem('custom_wallpaper_data'), val, (brightnessSlider ? brightnessSlider.value/100 : 1));
-      };
-    }
-    if(brightnessSlider) {
-      brightnessSlider.oninput = function() {
-        const val = (brightnessSlider.value/100).toFixed(2);
-        document.getElementById('wallpaper-brightness-label').textContent = `${brightnessSlider.value}%`;
-        localStorage.setItem('custom_wallpaper_brightness', val);
-        setWallpaper(localStorage.getItem('custom_wallpaper_data'), (opacitySlider ? opacitySlider.value/100 : 1), val);
-      };
-    }
-    if(resetWallpaperBtn) {
-      resetWallpaperBtn.onclick = function() {
-          localStorage.removeItem('custom_wallpaper_data');
-          localStorage.removeItem('custom_wallpaper_opacity');
-          localStorage.removeItem('custom_wallpaper_brightness');
-          setWallpaper('',1,1);
-          if (opacitySlider) { opacitySlider.value = 100; document.getElementById('wallpaper-opacity-label').textContent='100%'; }
-          if (brightnessSlider) { brightnessSlider.value=100; document.getElementById('wallpaper-brightness-label').textContent='100%'; }
-      }
-    }
-    loadWallpaperSetting();
+    // ===== 壁纸功能由 index.html 中的内联脚本处理，避免重复绑定事件 =====
     
     // === 全局事件监听 ===
     submitBtn.addEventListener('click', handleSubmission);
@@ -1829,6 +1802,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (themeToggle) {
         themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+    }
+
+    if (themeToggleSettings) {
+        themeToggleSettings.addEventListener('click', () => {
             const isDark = document.documentElement.classList.contains('dark');
             const newTheme = isDark ? 'light' : 'dark';
             localStorage.setItem('theme', newTheme);

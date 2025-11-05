@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI工厂 v14.0 - OCR增强版</title>
+    <!-- 启用 Tailwind 暗色模式的 class 策略，并在最早阶段应用保存的主题，避免闪烁 -->
+    <script>
+        // 1) 告诉 Tailwind 使用 class 策略切换暗色
+        window.tailwind = window.tailwind || {};
+        tailwind.config = { darkMode: 'class' };
+        // 2) 尽早设置 html 的 dark 类，减少首屏闪烁
+        (() => {
+            try {
+                const theme = localStorage.getItem('theme') || 'dark';
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                    document.addEventListener('DOMContentLoaded', () => {
+                        if (document.body) {
+                            document.body.classList.add('dark');
+                        }
+                    });
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.addEventListener('DOMContentLoaded', () => {
+                        if (document.body) {
+                            document.body.classList.remove('dark');
+                        }
+                    });
+                }
+            } catch (e) {
+                // 本地存储不可用时默认为暗色
+                document.documentElement.classList.add('dark');
+                document.addEventListener('DOMContentLoaded', () => {
+                    if (document.body) {
+                        document.body.classList.add('dark');
+                    }
+                });
+            }
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .form-input {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: #E2E8F0;
+            border: 1px solid #CBD5E0;
+            border-radius: 0.375rem;
+            color: #1A202C;
+        }
+        .dark .form-input {
+            background-color: #2D3748;
+            border-color: #4A5568;
+            color: #E2E8F0;
+        }
+        .form-input::placeholder {
+            color: #A0AEC0;
+        }
+        .dark .form-input::placeholder {
+            color: #718096;
+        }
+        .form-input:focus {
+            outline: 0;
+            border-color: #6366F1;
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.35);
+        }
+        .provider-item .edit-provider-form {
+            display: none;
+        }
+        .provider-item.open .edit-provider-form {
+            display: block;
+        }
+        .provider-item.open .header-arrow {
+            transform: rotate(180deg);
+        }
+        .chat-bubble {
+            max-width: 90%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .user-bubble {
+            background-color: #4A51C8;
+            color: #fff;
+            border-bottom-right-radius: 0.25rem;
+            align-self: flex-end;
+        }
+        .assistant-bubble {
+            background-color: #FFFFFF;
+            color: #1A202C;
+            border: 1px solid #E2E8F0;
+            border-bottom-left-radius: 0.25rem;
+            align-self: flex-start;
+        }
+        .dark .assistant-bubble {
+            background-color: #2D3748;
+            color: #E2E8F0;
+            border: none;
+        }
+        .turn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .assistant-response-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .action-buttons {
+            margin-top: 0.5rem;
+            margin-left: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+        .action-btn {
+            background-color: #E2E8F0;
+            color: #2D3748;
+            padding: 0.25rem 0.75rem;
+            border: none;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .dark .action-btn {
+            background-color: #4A5568;
+            color: #E2E8F0;
+        }
+        .action-btn:hover {
+            background-color: #6366F1;
+            color: #fff;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #FFFFFF;
+            color: #1A202C;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 70rem;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .dark .modal-content {
+            background-color: #1A202C;
+            color: #E2E8F0;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .collapsible-header {
+            cursor: pointer;
+        }
+        .collapsible-content {
+            display: none;
+        }
+        .collapse-wrapper.open .collapsible-content {
+            display: block;
+        }
+        .tab-btn {
+            color: #6B7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .dark .tab-btn {
+            color: #9CA3AF;
+        }
+        .tab-btn:hover {
+            color: #4F46E5;
+        }
+        .dark .tab-btn:hover {
+            color: #A5B4FC;
+        }
+        .tab-btn.active {
+            color: #6366F1;
+            border-bottom-color: #6366F1;
+        }
+        .tab-content {
+            display: none !important;
+        }
+        .tab-content.active {
+            display: flex !important;
+        }
+        .prompt-item {
+            background-color: #F3F4F6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 2px solid #E5E7EB;
+        }
+        .dark .prompt-item {
+            background-color: #2D3748;
+            border-color: #4A5568;
+        }
+        .prompt-item.active {
+            border-color: #6366F1;
+            background-color: #EEF2FF;
+        }
+        .dark .prompt-item.active {
+            background-color: #374151;
+        }
+        .dimension-score {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        .score-0 { background-color: #7F1D1D; color: #FEE2E2; }
+        .score-1 { background-color: #991B1B; color: #FECACA; }
+        .score-2 { background-color: #92400E; color: #FED7AA; }
+        .score-3 { background-color: #15803D; color: #BBF7D0; }
+        #sidebar.collapsed {
+            width: 0 !important;
+            max-width: 0 !important;
+            padding: 0 !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .provider-item {
+            background-color: rgba(226,232,240,0.7);
+            border: 1px solid #CBD5E0;
+        }
+        .dark .provider-item {
+            <!-- 设置标签页 -->
+            <div id="settings-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
+                <div class="p-4 space-y-6">
+                    <!-- 语言设置 -->
+                    <div id="lang-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="lang_title">语言设置</h3>
+                        <label class="text-black dark:text-gray-100">
+                            <input type="radio" name="ui-lang" value="zh" checked> <span data-i18n="lang_zh" class="text-black dark:text-gray-100">简体中文</span>
+                        </label>
+                        <label class="ml-6 text-black dark:text-gray-100">
+                            <input type="radio" name="ui-lang" value="en"> <span data-i18n="lang_en" class="text-black dark:text-gray-100">English</span>
+                        </label>
+                    </div>
+
+                    <!-- OCR模型设置 -->
+                    <div id="ocr-model-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel" style="display: block !important;">
+                        <h3 class="font-semibold mb-2 text-cyan-600 dark:text-cyan-400" data-i18n="ocr_model_title">📷 图片文字识别模型</h3>
+                        <p class="text-xs text-black dark:text-gray-400 mb-2" data-i18n="ocr_model_tip">选择用于识别图片文字的模型（仅显示支持图片的模型）</p>
+                        <select id="ocr-model-select" class="form-input text-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                            <option value="">🤖 自动选择（使用第一个支持图片的模型）</option>
+                        </select>
+                        <div class="mt-2 text-xs text-black dark:text-gray-500">
+                            💡 提示：需要先在"模型配置"中勾选支持图片的模型
+                        </div>
+                    </div>
+
+                    <!-- 壁纸设置 -->
+                    <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="wallpaper_title">壁纸设置</h3>
+                        <div class="mb-3">
+                            <input type="file" id="wallpaper-upload" accept="image/*" style="display:inline-block">
+                            <button id="wallpaper-upload-btn" class="ml-2 font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 transition-colors" data-i18n="upload_wallpaper_btn">上传壁纸</button>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20 text-black dark:text-gray-100" data-i18n="wallpaper_opacity">透明度</label>
+                            <input type="range" min="10" max="100" value="100" step="1" id="wallpaper-opacity" style="vertical-align:middle">
+                            <span id="wallpaper-opacity-label">100%</span>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20 text-black dark:text-gray-100" data-i18n="wallpaper_brightness">亮度</label>
+                            <input type="range" min="20" max="200" value="100" step="1" id="wallpaper-brightness">
+                            <span id="wallpaper-brightness-label">100%</span>
+                        </div>
+                        <div class="mb-3">
+                            <button id="reset-wallpaper-btn" class="font-bold py-1 px-3 text-sm rounded-md bg-red-600 hover:bg-red-700 transition-colors" data-i18n="reset_wallpaper_btn">恢复默认壁纸</button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-black dark:text-gray-100" data-i18n="wallpaper_blur_label">壁纸模糊程度</label>
+                            <input type="range" id="wallpaper-blur" min="0" max="20" value="5" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- 主题设置 -->
+                    <div id="theme-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="theme_title">主题设置</h3>
+                        <div class="flex items-center space-x-4">
+                            <button id="theme-toggle-settings" class="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-100">
+                                <span class="dark:hidden">🌙</span>
+                                <span class="hidden dark:inline">☀️</span>
+                            </button>
+                            <span class="text-sm text-black dark:text-gray-400" data-i18n="theme_toggle_label">切换亮/暗模式</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                </div>
+                <div id="model-selection-area" class="flex-shrink-0">
+                    <label class="block text-md font-medium text-black dark:text-gray-100 mb-2">选择参战模型</label>
+                    <div id="model-list-container" class="space-y-1 max-h-48 overflow-y-auto p-2 bg-gray-100 dark:bg-gray-900/50 rounded-md border border-gray-300 dark:border-gray-700"></div>
+                </div>
+            </div>
+            
+            <!-- 提示词管理标签页 -->
+            <div id="prompts-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
+                <div class="p-4 space-y-6 flex-grow overflow-y-auto">
+                    <!-- 提示词列表 -->
+                    <div id="prompt-list-container" class="space-y-4">
+                        <h2 class="text-xl font-bold text-black dark:text-gray-100">提示词管理</h2>
+                        <!-- 提示词将在这里动态添加 -->
+                    </div>
+                    <!-- 添加/编辑提示词表单 -->
+                    <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 id="prompt-form-title" class="text-md font-semibold mb-2 text-black dark:text-gray-100">添加新提示词</h3>
+                        <form id="prompt-form" class="space-y-3">
+                            <input type="hidden" name="id">
+                            <input name="name" required class="form-input text-sm" placeholder="提示词名称" data-i18n-placeholder="prompt_name">
+                            <label class="text-xs text-black dark:text-gray-400" data-i18n="review_instruction">评审提示词（使用{question}、{target}、{answer}作为占位符）</label>
+                            <textarea name="critique_prompt" required class="form-input text-sm h-32" placeholder="评审提示词..." data-i18n-placeholder="review_placeholder"></textarea>
+                            <label class="text-xs text-black dark:text-gray-400" data-i18n="revise_instruction">修订提示词（使用{original}、{feedback}作为占位符）</label>
+                            <textarea name="revision_prompt" required class="form-input text-sm h-32" placeholder="修订提示词..." data-i18n-placeholder="revise_placeholder"></textarea>
+                            <button type="submit" class="font-bold py-2 px-3 text-sm rounded-md bg-green-600 hover:bg-green-700 w-full transition-colors" data-i18n-btn="add_btn">添加</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <!-- 设置标签页 -->
+            <div id="settings-tab" class="tab-content flex-grow min-h-0 flex flex-col overflow-y-auto">
+                <div class="p-4 space-y-6">
+                    <!-- 语言设置 -->
+                    <div id="lang-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="lang_title">语言设置</h3>
+                        <label>
+                            <input type="radio" name="ui-lang" value="zh" checked> <span data-i18n="lang_zh" style="color: black !important;">简体中文</span>
+                        </label>
+                        <label class="ml-6">
+                            <input type="radio" name="ui-lang" value="en"> <span data-i18n="lang_en" style="color: black !important;">English</span>
+                        </label>
+                    </div>
+                    
+                    <!-- OCR模型设置 -->
+                    <div id="ocr-model-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel" style="display: block !important;">
+                        <h3 class="font-semibold mb-2 text-cyan-600 dark:text-cyan-400" data-i18n="ocr_model_title">📷 图片文字识别模型</h3>
+                        <p class="text-xs text-black dark:text-gray-400 mb-2" data-i18n="ocr_model_tip">选择用于识别图片文字的模型（仅显示支持图片的模型）</p>
+                        <select id="ocr-model-select" class="form-input text-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                            <option value="">🤖 自动选择（使用第一个支持图片的模型）</option>
+                        </select>
+                        <div class="mt-2 text-xs text-black dark:text-gray-500">
+                            💡 提示：需要先在"模型配置"中勾选支持图片的模型
+                        </div>
+                    </div>
+                    
+                    <!-- 壁纸设置 -->
+                    <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="wallpaper_title">壁纸设置</h3>
+                        <div class="mb-3">
+                            <input type="file" id="wallpaper-upload" accept="image/*" style="display:inline-block">
+                            <button id="wallpaper-upload-btn" class="ml-2 font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 transition-colors" data-i18n="upload_wallpaper_btn">上传壁纸</button>
+                        </div>
+                        <div class="mb-3">
+                            <button id="reset-wallpaper-btn" class="font-bold py-1 px-3 text-sm rounded-md bg-red-600 hover:bg-red-700 transition-colors" data-i18n="reset_wallpaper_btn">恢复默认壁纸</button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-black dark:text-gray-100" data-i18n="wallpaper_blur_label">壁纸模糊程度</label>
+                            <input type="range" id="wallpaper-blur" min="0" max="20" value="5" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- 主题设置 -->
+                    <div id="theme-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="theme_title">主题设置</h3>
+                        <div class="flex items-center space-x-4">
+                            <button id="theme-toggle" class="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700">
+                                <span class="dark:hidden">🌙</span>
+                                <span class="hidden dark:inline">☀️</span>
+                            </button>
+                            <span class="text-sm text-black dark:text-gray-400" data-i18n="theme_toggle_label">切换亮/暗模式</span>
+                        </div>
+                    </div>                    <!-- OCR模型设置 -->
+                    <div id="ocr-model-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel" style="display: block !important;">
+                        <h3 class="font-semibold mb-2 text-cyan-600 dark:text-cyan-400" data-i18n="ocr_model_title">📷 图片文字识别模型</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" data-i18n="ocr_model_tip">选择用于识别图片文字的模型（仅显示支持图片的模型）</p>
+                        <select id="ocr-model-select" class="form-input text-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                            <option value="">🤖 自动选择（使用第一个支持图片的模型）</option>
+                        </select>
+                        <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                            💡 提示：需要先在"模型配置"中勾选支持图片的模型
+                        </div>
+                    </div>
+                    
+                    <!-- 壁纸设置 -->
+                    <div id="wallpaper-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="wallpaper_title">壁纸设置</h3>
+                        <div class="mb-3">
+                            <input type="file" id="wallpaper-upload" accept="image/*" style="display:inline-block">
+                            <button id="wallpaper-upload-btn" class="ml-2 font-bold py-1 px-3 text-sm rounded-md bg-blue-600 hover:bg-blue-700 transition-colors" data-i18n="upload_wallpaper_btn">上传壁纸</button>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20" data-i18n="wallpaper_opacity">透明度</label>
+                            <input type="range" min="10" max="100" value="100" step="1" id="wallpaper-opacity" style="vertical-align:middle">
+                            <span id="wallpaper-opacity-label">100%</span>
+                        </div>
+                        <div class="mb-3 flex items-center gap-2">
+                            <label class="w-20" data-i18n="wallpaper_brightness">亮度</label>
+                            <input type="range" min="20" max="200" value="100" step="1" id="wallpaper-brightness">
+                            <span id="wallpaper-brightness-label">100%</span>
+                        </div>
+                        <div class="mb-3">
+                            <button id="reset-wallpaper-btn" class="font-bold py-1 px-3 text-sm rounded-md bg-red-600 hover:bg-red-700 transition-colors" data-i18n="reset_wallpaper_btn">恢复默认壁纸</button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-black dark:text-gray-100" data-i18n="wallpaper_blur_label">壁纸模糊程度</label>
+                            <input type="range" id="wallpaper-blur" min="0" max="20" value="5" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- 主题设置 -->
+                    <div id="theme-setting" class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-md panel">
+                        <h3 class="font-semibold mb-2 text-black dark:text-gray-100" data-i18n="theme_title">主题设置</h3>
+                        <div class="flex items-center space-x-4">
+                            <button id="theme-toggle" class="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700">
+                                <span class="dark:hidden">🌙</span>
+                                <span class="hidden dark:inline">☀️</span>
+                            </button>
+                            <span id="theme-text" class="text-sm font-medium text-black dark:text-gray-100">暗色</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <main class="flex-1 flex flex-col bg-gray-200/50 dark:bg-gray-800/50 h-full relative">
+        <div class="absolute top-4 right-4 z-10">
+            <button id="theme-toggle" class="px-3 py-1 text-sm rounded-full bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 flex items-center gap-2">
+                <svg id="theme-icon-sun" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM10 18a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1zM5.05 14.95l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM1.293 7.293a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zM18.707 7.293a1 1 0 00-1.414 0l-.707.707a1 1 0 101.414 1.414l.707-.707a1 1 0 000-1.414z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                <span id="theme-text">暗色</span>
+            </button>
+        </div>
+        <div id="chat-log" class="flex-1 p-6 overflow-y-auto w-full"></div>
+        <div class="p-4 border-t border-gray-300 dark:border-gray-700 flex-shrink-0">
+                <!-- 图片标签显示区域 -->
+                <div id="selected-files-display" class="mb-3 px-2" style="display:none;">
+                    <div id="file-names-list" class="flex flex-wrap gap-2"></div>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <button id="new-chat-btn" title="开始新对话" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 flex-shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- 图片选择按钮 -->
+                    <label for="bulk-image-input" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer flex-shrink-0" title="选择图片">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </label>
+                    <input type="file" id="bulk-image-input" accept="image/*" multiple class="hidden">
+                    
+                    <textarea id="question-input" rows="1" class="form-input flex-1 resize-none" placeholder="输入您的问题，或粘贴图片..." data-i18n-placeholder="input_placeholder"></textarea>
+
+                <!-- 发送按钮 -->
+                <button id="submit-btn" class="p-3 rounded-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 flex-shrink-0">
+                    <svg id="submit-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                    <svg id="loading-spinner" class="animate-spin h-6 w-6 text-white hidden" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </button>
+                
+                <!-- 停止按钮（默认隐藏） -->
+                <button id="stop-btn" class="p-3 rounded-full bg-red-600 hover:bg-red-700 flex-shrink-0 hidden">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <!-- 图片预览模态框 -->
+    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center" style="display: none;">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <img id="preview-image" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="图片预览">
+            <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
+                <span id="preview-filename">文件名</span>
+            </div>
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm">
+                按任意键或点击任意位置关闭
+            </div>
+        </div>
+    </div>
+    
+    <div id="details-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-cyan-400">生成过程详情</h2>
+                <button id="close-modal-btn" class="text-3xl font-bold p-2 leading-none rounded-full hover:bg-gray-700">&times;</button>
+            </div>
+            <div id="process-details-container" class="space-y-6"></div>
+        </div>
+    </div>
+    
+    <!-- 图片预览模态框 -->
+    <div id="image-preview-modal" class="fixed inset-0 bg-black bg-opacity-95 z-[9999]" style="display:none;">
+        <div class="relative w-full h-full flex flex-col items-center justify-center">
+            <div class="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-6 py-3 rounded-lg text-sm shadow-2xl z-10">
+                <span id="preview-filename" class="font-semibold text-lg"></span>
+                <span class="ml-4 text-black">按任意键或点击关闭</span>
+            </div>
+            <img id="preview-image" src="" alt="图片预览" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl">
+        </div>
+    </div>
+    <script>
+        // 启用调试模式
+        window.DEBUG = true;
+    </script>
+    <script src="/static/script.js?v=20251031003000"></script>
+</body>
+</html>
+

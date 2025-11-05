@@ -18,16 +18,6 @@ MIN_COMMENT_PREVIEW = 5
 MIN_COMMENT_AFTER_SCORE = 10
 MIN_COMMENT_FINAL = 15
 
-DISCLAIMER_PATTERNS = [
-    re.compile(r"无法(?:直接)?(?:查看|访问|识别).*?(?:图片|图像)", re.I),
-    re.compile(r"看不到这?(?:张)?(?:图片|图像)", re.I),
-    re.compile(r"作为.*?(?:文本|language|text).*?(?:模型|ai|model)(?!.*?(?:可以|能够|能|会))", re.I),
-    re.compile(r"(?:i am|i'm).*?(?:text[- ]only|language).*?(?:model|ai)", re.I),
-    re.compile(r"can't\s*(?:access|see|view).*?(?:image|picture)", re.I),
-    re.compile(r"no\s*(?:vision|image\s*capability)", re.I),
-    re.compile(r"没有.*?(?:视觉|图像|图片).*?(?:能力|功能)", re.I)
-]
-
 class Orchestrator:
     async def process_query_stream(
         self, 
@@ -54,23 +44,14 @@ class Orchestrator:
             yield {"type": "error", "data": "没有可用的模型"}
             return
         
-        # 如果有OCR文本，将其与用户问题合并，作为更丰富且显式的上下文
-        ocr_text_clean = ocr_text.strip() if ocr_text else ""
-        user_question_clean = user_question.strip()
-
-        if ocr_text_clean:
+        # 如果有OCR文本，将其与用户问题合并，作为更丰富的上下文
+        if ocr_text and ocr_text.strip():
             combined_question = (
-                "【OCR识别文本】\n"
-                f"{ocr_text_clean}\n\n"
-                "【强制要求】\n"
-                "1. 你无法直接查看原图，禁止回复“无法看到图片”“我是文本AI”等托辞。\n"
-                "2. 必须完全依据上方OCR文字做出专业分析，指出优点、缺陷与改进建议。\n"
-                "3. 如OCR文字存在缺漏，请说明缺失信息对判断的影响。\n"
-                "4. 结尾至少提出两条具体改进建议。\n"
-                f"【用户问题】{user_question_clean or '请基于OCR内容给出详细、严格的专业评估。'}"
+                f"以下是图片识别得到的文字内容：\n{ocr_text.strip()}\n\n"
+                f"请结合以上识别文本回答：{user_question}"
             )
         else:
-            combined_question = user_question_clean or "请结合已有对话提供回答。"
+            combined_question = user_question
 
         messages = history + [{"role": "user", "content": combined_question}]
         
@@ -105,7 +86,7 @@ class Orchestrator:
         critiques = {m.name: [] for m in active_models}
         critique_tasks = [
             (critic.name, target.name, self._generate_critique(
-                critic, target.name, combined_question, initial_answers.get(target.name, ""), ocr_text_clean
+                critic, target.name, user_question, initial_answers.get(target.name, "")
             ))
             for critic in active_models 
             for target in active_models 
@@ -161,9 +142,9 @@ class Orchestrator:
             "data": {"best_answer": best_answer, "process_details": details}
         }
     
-    async def _generate_critique(self, critic_model, target_name: str, question: str, answer: str, ocr_text: str = "") -> tuple:
+    async def _generate_critique(self, critic_model, target_name: str, question: str, answer: str) -> tuple:
         active_prompt = db.get_active_prompt()
-        prompt = self._build_critique_prompt(question, target_name, answer, active_prompt, ocr_text)
+        prompt = self._build_critique_prompt(question, target_name, answer, active_prompt)
 
         attempts = 0
         max_attempts = 3
@@ -229,15 +210,6 @@ class Orchestrator:
             }
             for name in initial.keys()
         ]
-
-        for item in results:
-            if self._contains_disclaimer(item.get("revised_answer")) or self._contains_disclaimer(item.get("initial_answer")):
-                item["total_score"] = 0.0
-                item["disqualified_reason"] = "vision_disclaimer"
-            else:
-                critic_penalties = [c for c in item.get("critiques_received", []) if c.get("penalty_reason") == "vision_disclaimer"]
-                if critic_penalties:
-                    item.setdefault("warnings", []).append("critique_disclaimer")
         
         results.sort(key=lambda x: x['total_score'], reverse=True)
         if results:
@@ -246,56 +218,47 @@ class Orchestrator:
             best_answer = "无结果"
         return best_answer, results
     
-    def _build_critique_prompt(self, question: str, target: str, answer: str, prompt_template: Optional[Dict] = None, ocr_text: str = "") -> str:
+    def _build_critique_prompt(self, question: str, target: str, answer: str, prompt_template: Optional[Dict] = None) -> str:
         if prompt_template and prompt_template.get('critique_prompt'):
             template = prompt_template['critique_prompt']
-            return template.format(question=question, target=target, answer=answer, ocr_text=ocr_text)
-        
-        # 默认提示词 - 包含OCR文本上下文
-        ocr_section = ""
-        if ocr_text:
-            ocr_section = f"""【图片内容 (OCR识别)】
-{ocr_text}
-
-"""
-        
+            return template.format(question=question, target=target, answer=answer)
+        # 默认提示词
         return f"""你是一位专业的同行评审专家。【重要：必须严格按照指定格式输出，否则评审无效】
 
-【评审背景】
-{ocr_section}【评审问题】
-{question}
+【评审任务】
+问题: {question}
+被评审模型: {target}
+被评审答案: {answer}
 
-【被评审的答案 (来自 {target})】
-{answer}
+【评分标准】(每项0-3分)
+1. 准确性: 3=完全准确 2=基本准确 1=有错误 0=严重错误
+2. 完整性: 3=全面覆盖 2=略有遗漏 1=明显不足 0=严重不完整
+3. 清晰性: 3=清晰明了 2=基本清晰 1=表达混乱 0=难以理解
+4. 实用性: 3=非常实用 2=有帮助 1=缺乏实操性 0=无用
 
-【评分标准】(每项0-3分，必须严格区分)
-1. 准确性: 3=完全准确无误 2=基本准确但有小瑕疵 1=有明显错误 0=严重错误或完全相反
-2. 完整性: 3=全面深入，覆盖所有关键点 2=覆盖大部分要点但有遗漏 1=覆盖不足 0=严重不完整
-3. 清晰性: 3=表达清晰有条理 2=基本清晰但逻辑稍乱 1=表达不够清楚 0=难以理解
-4. 实用性: 3=可直接应用，提供具体方案 2=有帮助但缺乏实操细节 1=理论多实践少 0=无用
+【输出格式 - 必须严格遵守】
+请直接输出以下格式，不要添加任何前缀、标题或额外内容：
 
-【评语要求】(至少80字，必须具体指向答案内容)
-- 不要使用通用表述，必须针对该答案的具体内容
-- 指出具体的好处 (如："答案准确指出了...")
-- 指出具体的问题 (如："答案遗漏了..." 或 "答案错误地说...")
-- 给出具体的改进建议 (如："可以补充..." 或 "应该修正...")
-- 如有OCR文本，务必参考其内容进行评价
+准确性: [写0或1或2或3]
+完整性: [写0或1或2或3]
+清晰性: [写0或1或2或3]
+实用性: [写0或1或2或3]
+总分: [四项得分相加，0-12之间]
+评语: [至少50字的详细评语，必须包括：1)具体优点 2)明确缺陷 3)改进建议]
 
-【输出格式 - 必须严格遵守，不要添加任何其他内容】
-准确性: [0-3]
-完整性: [0-3]
-清晰性: [0-3]
-实用性: [0-3]
-总分: [0-12]
-评语: [80字以上的具体评语]
-
-【格式示例】
+【示例输出】
 准确性: 2
-完整性: 1
-清晰性: 2
-实用性: 3
+完整性: 2
+清晰性: 3
+实用性: 1
 总分: 8
-评语: 该答案准确地指出了OCR文本中的关键词"design"，但完整性不足，遗漏了对"layout"的分析。表达基本清晰。实用性较好，提供了可行的改进方向。建议补充对"color harmony"的讨论，并提供具体的设计工具或参考资源。"""
+评语: 该答案准确性较好，基本符合事实。完整性方面略有不足，缺少了对X的讨论。表达清晰易懂。但实用性较差，缺乏具体的操作步骤。建议补充实际案例和详细步骤，增加代码示例。
+
+【警告】
+- 不要输出任何其他格式
+- 不要省略任何评分项
+- 评语不能少于50字
+- 必须给出具体的改进建议"""
 
     def _build_retry_prompt(
         self,
@@ -355,14 +318,6 @@ class Orchestrator:
 改进要求: 针对性修复缺陷，补充遗漏内容，优化表达，增加实用性。
 输出改进后的答案:"""
     
-    def _contains_disclaimer(self, text: Optional[str]) -> bool:
-        if not text:
-            return False
-        for pattern in DISCLAIMER_PATTERNS:
-            if pattern.search(text):
-                return True
-        return False
-
     def _parse_critique(self, text: str, critic_name: str) -> Dict:
         # 检查是否为模型返回的错误信息
         if text.strip().startswith("[Error:") or "Error code:" in text:
@@ -390,15 +345,21 @@ class Orchestrator:
             "raw_text": text
         }
 
+<<<<<<< HEAD
+        logger.debug("解析 %s 的评审输出", critic_name)
+        preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
+        logger.debug("原始文本 (%d 字符): %s", len(text), preview)
+=======
         logger.debug(f"解析 {critic_name} 的评审输出")
         preview = text if len(text) < MAX_PREVIEW_LENGTH else text[:MAX_PREVIEW_LENGTH] + "..."
         logger.debug(f"原始文本 ({len(text)} 字符): {preview}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 
         field_patterns = [
-            ("accuracy", [r"准确性\s*[:：]\s*(\d+)(?:/\d+)?", r"accuracy\s*[:：]?\s*(\d+)(?:/\d+)?"]),
-            ("completeness", [r"完整性\s*[:：]\s*(\d+)(?:/\d+)?", r"completeness\s*[:：]?\s*(\d+)(?:/\d+)?"]),
-            ("clarity", [r"清晰性\s*[:：]\s*(\d+)(?:/\d+)?", r"clarity\s*[:：]?\s*(\d+)(?:/\d+)?"]),
-            ("usefulness", [r"实用性\s*[:：]\s*(\d+)(?:/\d+)?", r"usefulness\s*[:：]?\s*(\d+)(?:/\d+)?"])
+            ("accuracy", [r"准确性\s*[:：]\s*(\d+)", r"准确性\s*(\d+)", r"accuracy\s*[:：]?\s*(\d+)"]),
+            ("completeness", [r"完整性\s*[:：]\s*(\d+)", r"完整性\s*(\d+)", r"completeness\s*[:：]?\s*(\d+)"]),
+            ("clarity", [r"清晰性\s*[:：]\s*(\d+)", r"清晰性\s*(\d+)", r"clarity\s*[:：]?\s*(\d+)"]),
+            ("usefulness", [r"实用性\s*[:：]\s*(\d+)", r"实用性\s*(\d+)", r"usefulness\s*[:：]?\s*(\d+)"])
         ]
 
         for field, patterns in field_patterns:
@@ -408,39 +369,49 @@ class Orchestrator:
                 if match:
                     data[field] = min(MAX_SCORE_PER_FIELD, int(match.group(1)))
                     found = True
-                    logger.debug(f"找到 {field}: {data[field]} (使用正则: {pattern})")
+<<<<<<< HEAD
+                    logger.debug("找到%s: %d", field, data[field])
                     break
             if not found:
                 data["missing_fields"].append(field)
-                logger.warning(f"未找到 {field} 评分")
+                logger.debug("未找到%s评分", field)
+=======
+                    logger.debug(f"找到{field}: {data[field]}")
+                    break
+            if not found:
+                data["missing_fields"].append(field)
+                logger.debug(f"未找到{field}评分")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
 
-        total_patterns = [r"总分\s*[:：]\s*(\d+)(?:/\d+)?", r"total\s*[:：]?\s*(\d+)(?:/\d+)?"]
+        total_patterns = [r"总分\s*[:：]\s*(\d+)", r"总分\s*(\d+)", r"total\s*[:：]?\s*(\d+)"]
         total_found = False
         for pattern in total_patterns:
             match = re.search(pattern, text, re.I)
             if match:
                 data["score"] = min(MAX_TOTAL_SCORE, int(match.group(1)))
                 total_found = True
-                logger.debug(f"找到总分: {data['score']} (使用正则: {pattern})")
+<<<<<<< HEAD
+                logger.debug("找到总分: %d", data['score'])
+=======
+                logger.debug(f"找到总分: {data['score']}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
                 break
 
-        calculated_score = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
-
         if not total_found:
-            # 如果没有通过正则找到总分，则使用计算出的分数
-            data["score"] = calculated_score
-            logger.info(f"未找到总分，使用计算值: {data['score']}")
-            # 如果计算出的分数大于0，我们认为总分是有效的，即使它没有被显式提供
-            if calculated_score == 0 and "total" not in data["missing_fields"]:
-                 data["missing_fields"].append("total")
-                 logger.warning("计算总分为0，可能存在解析问题")
-        else:
-            # 如果找到了总分，但它与计算值不匹配，记录一个警告
-            if data["score"] != calculated_score:
-                logger.warning(
-                    f"解析到的总分 ({data['score']}) 与计算值 ({calculated_score}) 不匹配。 "
-                    f"将使用解析到的总分。这可能表示模型没有正确计算总和。"
+            data["score"] = data["accuracy"] + data["completeness"] + data["clarity"] + data["usefulness"]
+            if 0 < data["score"] <= MAX_TOTAL_SCORE:
+                logger.debug(
+<<<<<<< HEAD
+                    "计算总分: %d = %d+%d+%d+%d",
+                    data['score'], data['accuracy'], data['completeness'], data['clarity'], data['usefulness']
+=======
+                    f"计算总分: {data['score']} = {data['accuracy']}+{data['completeness']}+"
+                    f"{data['clarity']}+{data['usefulness']}"
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
                 )
+            else:
+                data["missing_fields"].append("total")
+                logger.debug("无法确认总分")
         
         # 提取评语 - 多种模式尝试
         comment_found = False
@@ -468,7 +439,7 @@ class Orchestrator:
         
         # 模式3: 如果前面都没有找到，尝试提取总分之后的内容
         if not comment_found:
-            after_score = re.search(r"总分\s*[:：]\s*\d+(?:/\d+)?\s*\n+(.*)", text, re.I | re.DOTALL)
+            after_score = re.search(r"总分\s*[:：]\s*\d+\s*\n+(.*)", text, re.I | re.DOTALL)
             if after_score:
                 comment_text = after_score.group(1).strip()
                 # 移除可能的多余换行和空格
@@ -481,8 +452,8 @@ class Orchestrator:
         if not comment_found:
             # 找到最后一个评分项之后的内容
             last_score_pos = 0
-            for pattern in [r"准确性\s*[:：]\s*\d+(?:/\d+)?", r"完整性\s*[:：]\s*\d+(?:/\d+)?", 
-                           r"清晰性\s*[:：]\s*\d+(?:/\d+)?", r"实用性\s*[:：]\s*\d+(?:/\d+)?", r"总分\s*[:：]\s*\d+(?:/\d+)?"]:
+            for pattern in [r"准确性\s*[:：]\s*\d+", r"完整性\s*[:：]\s*\d+", 
+                           r"清晰性\s*[:：]\s*\d+", r"实用性\s*[:：]\s*\d+", r"总分\s*[:：]\s*\d+"]:
                 match = re.search(pattern, text, re.I)
                 if match:
                     last_score_pos = max(last_score_pos, match.end())
@@ -498,124 +469,29 @@ class Orchestrator:
         # 如果所有模式都失败了，使用整个文本作为评语（但排除评分行）
         if not comment_found or not data["comment"]:
             # 移除所有评分行
-            cleaned_text = re.sub(r'(准确性|完整性|清晰性|实用性|总分)\s*[:：]\s*\d+(?:/\d+)?\s*\n?', '', text, flags=re.I)
+            cleaned_text = re.sub(r'(准确性|完整性|清晰性|实用性|总分)\s*[:：]\s*\d+\s*\n?', '', text, flags=re.I)
             cleaned_text = cleaned_text.strip()
             if cleaned_text and len(cleaned_text) > MIN_COMMENT_FINAL:
                 data["comment"] = cleaned_text
             else:
                 data["comment"] = f"模型 {critic_name} 未按要求提供详细评语。"
-                if "comment" not in data["missing_fields"]:
-                    data["missing_fields"].append("comment")
-
-        self._apply_strict_penalties(data)
+                data["missing_fields"].append("comment")
 
         logger.info(
+<<<<<<< HEAD
+            "最终评分: 准确%d 完整%d 清晰%d 实用%d = %d/12",
+            data['accuracy'], data['completeness'], data['clarity'], data['usefulness'], data['score']
+        )
+        if data.get("missing_fields"):
+            logger.warning("缺少字段: %s", data['missing_fields'])
+=======
             f"最终评分: 准确{data['accuracy']} 完整{data['completeness']} "
             f"清晰{data['clarity']} 实用{data['usefulness']} = {data['score']}/12"
         )
         if data.get("missing_fields"):
             logger.warning(f"缺少字段: {data['missing_fields']}")
+>>>>>>> be94bdad56a8eade804f74bcb38bc756f6274e73
         
         return data
-
-    def _apply_strict_penalties(self, data: Dict[str, Any]) -> None:
-        """
-        调整和校准评分，使其更合理，避免极端高分或低分。
-        新逻辑 (v3):
-        1. 基础分映射: 稍微降低原始分，但比之前宽松。3->2.5, 2->1.8, 1->1.0。
-        2. 智能分析评语:
-           - 高分低评 (给出高分但评语负面): 扣分。
-           - 低分高评 (给出低分但评语正面): 扣分。
-           - 低分且评语具体指出问题: 奖励。
-        3. 评语质量调整: 长度不足或过于笼统会轻微扣分。
-        4. 最终分数映射: 将计算出的分数映射到0-12分的区间，使其分布更合理。
-        """
-        comment_text = (data.get("comment", "") or "").lower()
-        raw_text = (data.get("raw_text", "") or "").lower()
-
-        # 规则1: 如果包含免责声明，直接0分
-        if self._contains_disclaimer(comment_text) or self._contains_disclaimer(raw_text):
-            for field in ("accuracy", "completeness", "clarity", "usefulness"):
-                data[field] = 0
-            data["score"] = 0.0
-            data["penalty_reason"] = "vision_disclaimer"
-            return
-
-        # 规则2: 基础分重新映射
-        base_score = 0.0
-        field_scores = {}
-        for field in ("accuracy", "completeness", "clarity", "usefulness"):
-            original_value = data.get(field, 0)
-            
-            if original_value >= 3:
-                adjusted_value = 2.5
-            elif original_value == 2:
-                adjusted_value = 1.8
-            elif original_value == 1:
-                adjusted_value = 1.0
-            else:
-                adjusted_value = 0.0
-            
-            field_scores[field] = adjusted_value
-            base_score += adjusted_value
-        
-        # 规则3: 基于评语和评分的一致性进行调整
-        adjustment = 0.0
-        negative_keywords = ["但", "不足", "问题", "缺陷", "遗漏", "错误", "however", "issue", "problem", "lack"]
-        positive_keywords = ["准确", "清晰", "完整", "优秀", "全面", "很好", "good", "excellent", "clear"]
-
-        has_negative = any(kw in comment_text for kw in negative_keywords)
-        has_positive = any(kw in comment_text for kw in positive_keywords)
-
-        # 如果总分偏高（>=8），但评语包含负面词，说明可能过誉，扣分
-        if base_score >= 8.0 and has_negative:
-            adjustment -= 1.0
-        
-        # 如果总分偏低（<=5），但评语主要是正面词，说明可能过谦，也轻微扣分
-        if base_score <= 5.0 and has_positive and not has_negative:
-            adjustment -= 0.5
-
-        # 如果总分偏低（<=5），且评语包含负面词，说明批评到位，给予奖励
-        if base_score <= 5.0 and has_negative:
-            adjustment += 1.0
-
-        # 规则4: 评语质量调整
-        if len(comment_text) < MIN_COMMENT_LENGTH:
-            adjustment -= 1.0  # 评语太短，扣分
-        
-        # 如果模型给自己的所有单项都打了满分，这通常是不合理的，进行惩罚
-        if all(data.get(f, 0) == 3 for f in ("accuracy", "completeness", "clarity", "usefulness")):
-            adjustment -= 2.0
-
-        # 规则5: 计算最终分数
-        # 基础分(0-10) + 调整项(-4.5 ~ +1.0)
-        final_score = base_score + adjustment
-
-        # 将分数映射到更合理的0-12分范围
-        # 使用一个非线性函数 (如sigmoid变体) 来调整分布，让分数更集中在中间区域
-        # 这里的映射函数将原始的 final_score (大致在-4.5到11之间) 映射到 0-12
-        # 我们设计一个函数，让 5分 -> 7分, 8分 -> 10分, 10分 -> 11.5分
-        if final_score > 0:
-            # 一个简化的映射：高于5分的部分打折，低于5分的部分放大
-            if final_score <= 5:
-                # 0-5分区间拉伸到0-7分
-                mapped_score = final_score * (7/5)
-            else:
-                # 5-11分区间压缩到7-12分
-                mapped_score = 7 + (final_score - 5) * (5/6)
-        else:
-            mapped_score = 0
-
-        # 确保分数在0-12的范围内
-        final_score = max(0.0, min(12.0, mapped_score))
-
-        # 如果有任何字段缺失，分数直接归零，以惩罚不按格式输出的模型
-        if data.get("missing_fields"):
-            final_score = 0.0
-
-        data["score"] = round(final_score, 1)
-        # 将调整后的各单项分也更新回去，虽然主要以总分为准
-        for field, score in field_scores.items():
-            data[field] = round(score, 1)
 
 
