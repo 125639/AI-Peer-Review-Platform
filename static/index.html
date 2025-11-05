@@ -60,78 +60,78 @@
         
         /* 有壁纸时，侧边栏恢复原来的样式，确保内容清晰可见 */
         body.has-wallpaper .sidebar {
-            background: rgba(37, 41, 50, 0.85) !important;
-            backdrop-filter: blur(10px) !important;
+            background: rgba(37, 41, 50, 0.90) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .sidebar {
-            background: rgba(237, 242, 247, 0.92) !important;
-            backdrop-filter: blur(10px) !important;
+            background: rgba(237, 242, 247, 0.95) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         /* 主内容区 - 适度透明，保持壁纸可见但确保文字可读 */
         body.has-wallpaper .main-content {
-            background: rgba(26, 29, 35, 0.70) !important;
-            backdrop-filter: blur(8px) !important;
+            background: rgba(26, 29, 35, 0.75) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .main-content {
-            background: rgba(247, 250, 252, 0.80) !important;
-            backdrop-filter: blur(8px) !important;
+            background: rgba(247, 250, 252, 0.85) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         /* 有壁纸时，输入区域更不透明以确保输入框清晰可见 */
         body.has-wallpaper .input-area {
-            background: rgba(37, 41, 50, 0.85) !important;
-            backdrop-filter: blur(10px) !important;
+            background: rgba(37, 41, 50, 0.90) !important;
+            backdrop-filter: blur(2px) !important;
             border-top: 1px solid rgba(74, 85, 104, 0.4) !important;
         }
         
         body.has-wallpaper .input-container {
-            background: rgba(50, 58, 70, 0.90) !important;
-            backdrop-filter: blur(5px) !important;
+            background: rgba(50, 58, 70, 0.92) !important;
+            backdrop-filter: blur(2px) !important;
             border: 1px solid rgba(58, 69, 83, 0.5) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-area {
-            background: rgba(237, 242, 247, 0.92) !important;
-            backdrop-filter: blur(10px) !important;
+            background: rgba(237, 242, 247, 0.95) !important;
+            backdrop-filter: blur(2px) !important;
             border-top: 1px solid rgba(203, 213, 224, 0.4) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-container {
-            background: rgba(255, 255, 255, 0.95) !important;
+            background: rgba(255, 255, 255, 0.96) !important;
             border: 1px solid rgba(226, 232, 240, 0.5) !important;
-            backdrop-filter: blur(5px) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         /* 有壁纸时，聊天消息增加背景不透明度，确保文字清晰可读 */
         body.has-wallpaper .chat-message {
-            background: rgba(50, 58, 70, 0.75) !important;
-            backdrop-filter: blur(8px) !important;
+            background: rgba(50, 58, 70, 0.80) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         body.has-wallpaper .chat-message.user {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(147, 51, 234, 0.75)) !important;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.88), rgba(147, 51, 234, 0.80)) !important;
             border: 1px solid rgba(59, 130, 246, 0.3) !important;
         }
         
         body.has-wallpaper .chat-message.assistant {
-            background: linear-gradient(135deg, rgba(147, 51, 234, 0.80), rgba(59, 130, 246, 0.75)) !important;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.85), rgba(59, 130, 246, 0.80)) !important;
             border: 1px solid rgba(147, 51, 234, 0.25) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message {
-            background: rgba(255, 255, 255, 0.85) !important;
-            backdrop-filter: blur(8px) !important;
+            background: rgba(255, 255, 255, 0.88) !important;
+            backdrop-filter: blur(2px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message.user {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.80), rgba(147, 51, 234, 0.70)) !important;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(147, 51, 234, 0.75)) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message.assistant {
-            background: linear-gradient(135deg, rgba(147, 51, 234, 0.75), rgba(59, 130, 246, 0.70)) !important;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.80), rgba(59, 130, 246, 0.75)) !important;
         }
         
         body::before {
@@ -149,6 +149,12 @@
             filter: none;
             z-index: -2;
             pointer-events: none;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: high-quality;
+            -webkit-backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
         }
         
         body::after {
