@@ -115,7 +115,7 @@ class Orchestrator:
         critiques = {m.name: [] for m in active_models}
         critique_tasks = [
             (critic.name, target.name, self._generate_critique(
-                critic, target.name, combined_question, initial_answers.get(target.name, ""), ocr_text_clean
+                critic, target.name, combined_question, initial_answers.get(target.name, ""), ocr_text_clean, tools, tool_choice
             ))
             for critic in active_models 
             for target in active_models 
@@ -141,7 +141,7 @@ class Orchestrator:
         revised_answers = {}
         revision_tasks = [
             (model.name, self._generate_revision(
-                model, initial_answers.get(model.name, ""), critiques.get(model.name, [])
+                model, initial_answers.get(model.name, ""), critiques.get(model.name, []), tools, tool_choice
             ))
             for model in active_models 
             if critiques.get(model.name)

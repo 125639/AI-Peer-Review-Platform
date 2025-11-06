@@ -403,7 +403,7 @@ class GeminiModel(BaseModel):
         genai.configure(api_key=provider_config['api_key'])
         self.model = genai.GenerativeModel(model_name)
 
-    async def generate(self, messages: List[Dict]) -> str:
+    async def generate(self, messages: List[Dict], tools: Optional[List[Any]] = None, tool_choice: Optional[str] = None) -> str:
         try:
             gemini_messages = [
                 {'role': 'user' if msg['role'] == 'user' else 'model', 'parts': [msg['content']]}

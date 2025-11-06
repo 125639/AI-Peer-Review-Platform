@@ -86,7 +86,8 @@ async def stream_process_generator(request: QueryRequest) -> AsyncGenerator[str,
             request.selected_models, 
             history_dicts, 
             request.ocr_text,
-            tools=tools if tools else None
+            tools=tools if tools else None,
+            tool_choice="auto" if tools else None
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.01)
