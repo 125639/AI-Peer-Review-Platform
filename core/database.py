@@ -45,27 +45,6 @@ def initialize_database():
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS chat_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                messages TEXT NOT NULL, -- JSON string of messages
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS general_prompts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                category TEXT NOT NULL, -- system, user, assistant, image, news, search
-                content TEXT NOT NULL,
-                description TEXT,
-                is_active INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
         # 插入默认提示词(中英文)
         conn.execute('''
             INSERT OR IGNORE INTO prompts (id, name_zh, description_zh, critique_prompt_zh, revision_prompt_zh, name_en, description_en, critique_prompt_en, revision_prompt_en, is_active)
@@ -314,86 +293,6 @@ def set_active_prompt(prompt_id: int) -> bool:
 def delete_prompt(prompt_id: int) -> bool:
     with get_db_connection() as conn:
         result = conn.execute('DELETE FROM prompts WHERE id = ?', (prompt_id,)).rowcount > 0
-        conn.commit()
-        return result
-
-# 聊天历史管理
-def get_all_chat_history(limit: int = 50) -> List[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        histories = conn.execute(
-            'SELECT * FROM chat_history ORDER BY created_at DESC LIMIT ?',
-            (limit,)
-        ).fetchall()
-        return [dict(h) for h in histories]
-
-def add_chat_history(title: str, messages: str) -> int:
-    with get_db_connection() as conn:
-        cursor = conn.execute(
-            'INSERT INTO chat_history (title, messages) VALUES (?, ?)',
-            (title, messages)
-        )
-        conn.commit()
-        return cursor.lastrowid
-
-def get_chat_history_by_id(history_id: int) -> Optional[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        history = conn.execute(
-            'SELECT * FROM chat_history WHERE id = ?',
-            (history_id,)
-        ).fetchone()
-        return dict(history) if history else None
-
-def delete_chat_history(history_id: int) -> bool:
-    with get_db_connection() as conn:
-        result = conn.execute('DELETE FROM chat_history WHERE id = ?', (history_id,)).rowcount > 0
-        conn.commit()
-        return result
-
-# 通用提示词管理
-def get_all_general_prompts(category: Optional[str] = None) -> List[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        if category:
-            prompts = conn.execute(
-                'SELECT * FROM general_prompts WHERE category = ? ORDER BY id',
-                (category,)
-            ).fetchall()
-        else:
-            prompts = conn.execute('SELECT * FROM general_prompts ORDER BY category, id').fetchall()
-        return [dict(p) for p in prompts]
-
-def add_general_prompt(name: str, category: str, content: str, description: str = '') -> int:
-    with get_db_connection() as conn:
-        cursor = conn.execute(
-            'INSERT INTO general_prompts (name, category, content, description) VALUES (?, ?, ?, ?)',
-            (name, category, content, description)
-        )
-        conn.commit()
-        return cursor.lastrowid
-
-def update_general_prompt(prompt_id: int, name: str, category: str, content: str, description: str = '') -> bool:
-    with get_db_connection() as conn:
-        result = conn.execute(
-            'UPDATE general_prompts SET name = ?, category = ?, content = ?, description = ? WHERE id = ?',
-            (name, category, content, description, prompt_id)
-        ).rowcount > 0
-        conn.commit()
-        return result
-
-def delete_general_prompt(prompt_id: int) -> bool:
-    with get_db_connection() as conn:
-        result = conn.execute('DELETE FROM general_prompts WHERE id = ?', (prompt_id,)).rowcount > 0
-        conn.commit()
-        return result
-
-def set_active_general_prompt(category: str, prompt_id: int) -> bool:
-    with get_db_connection() as conn:
-        # 先将该分类下的所有提示词设为非活动
-        conn.execute('UPDATE general_prompts SET is_active = 0 WHERE category = ?', (category,))
-        # 设置指定提示词为活动
-        result = conn.execute(
-            'UPDATE general_prompts SET is_active = 1 WHERE id = ? AND category = ?',
-            (prompt_id, category)
-        ).rowcount > 0
         conn.commit()
         return result
 

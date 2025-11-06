@@ -46,33 +46,9 @@ class OpenAIModel(BaseModel):
 
     def __init__(self, provider_config: Dict[str, Any], model_name: str):
         super().__init__(provider_config, model_name)
-        
-        # 配置代理
-        from core.config import get_config
-        import httpx
-        config = get_config()
-        http_client = None
-        
-        if config.proxy.enabled and config.proxy.host and config.proxy.port:
-            proxy_url = None
-            if config.proxy.type == 'http':
-                if config.proxy.username and config.proxy.password:
-                    proxy_url = f"http://{config.proxy.username}:{config.proxy.password}@{config.proxy.host}:{config.proxy.port}"
-                else:
-                    proxy_url = f"http://{config.proxy.host}:{config.proxy.port}"
-            elif config.proxy.type in ['socks5', 'socks']:
-                if config.proxy.username and config.proxy.password:
-                    proxy_url = f"socks5://{config.proxy.username}:{config.proxy.password}@{config.proxy.host}:{config.proxy.port}"
-                else:
-                    proxy_url = f"socks5://{config.proxy.host}:{config.proxy.port}"
-            
-            if proxy_url:
-                http_client = httpx.AsyncClient(proxy=proxy_url)
-        
         self.client = openai.AsyncOpenAI(
             api_key=provider_config['api_key'],
-            base_url=provider_config.get('api_base'),
-            http_client=http_client
+            base_url=provider_config.get('api_base')
         )
 
     async def generate(self, messages: List[ChatCompletionMessageParam], tools: Optional[List[Any]] = None, tool_choice: Optional[str] = None) -> str:

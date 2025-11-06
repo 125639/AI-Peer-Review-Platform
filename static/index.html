@@ -60,78 +60,78 @@
         
         /* 有壁纸时，侧边栏恢复原来的样式，确保内容清晰可见 */
         body.has-wallpaper .sidebar {
-            background: rgba(37, 41, 50, 0.90) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(37, 41, 50, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .sidebar {
-            background: rgba(237, 242, 247, 0.95) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(237, 242, 247, 0.92) !important;
+            backdrop-filter: blur(10px) !important;
         }
         
         /* 主内容区 - 适度透明，保持壁纸可见但确保文字可读 */
         body.has-wallpaper .main-content {
-            background: rgba(26, 29, 35, 0.75) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(26, 29, 35, 0.70) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .main-content {
-            background: rgba(247, 250, 252, 0.85) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(247, 250, 252, 0.80) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         /* 有壁纸时，输入区域更不透明以确保输入框清晰可见 */
         body.has-wallpaper .input-area {
-            background: rgba(37, 41, 50, 0.90) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(37, 41, 50, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
             border-top: 1px solid rgba(74, 85, 104, 0.4) !important;
         }
         
         body.has-wallpaper .input-container {
-            background: rgba(50, 58, 70, 0.92) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(50, 58, 70, 0.90) !important;
+            backdrop-filter: blur(5px) !important;
             border: 1px solid rgba(58, 69, 83, 0.5) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-area {
-            background: rgba(237, 242, 247, 0.95) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(237, 242, 247, 0.92) !important;
+            backdrop-filter: blur(10px) !important;
             border-top: 1px solid rgba(203, 213, 224, 0.4) !important;
         }
         
         html:not(.dark) body.has-wallpaper .input-container {
-            background: rgba(255, 255, 255, 0.96) !important;
+            background: rgba(255, 255, 255, 0.95) !important;
             border: 1px solid rgba(226, 232, 240, 0.5) !important;
-            backdrop-filter: blur(2px) !important;
+            backdrop-filter: blur(5px) !important;
         }
         
         /* 有壁纸时，聊天消息增加背景不透明度，确保文字清晰可读 */
         body.has-wallpaper .chat-message {
-            background: rgba(50, 58, 70, 0.80) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(50, 58, 70, 0.75) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         body.has-wallpaper .chat-message.user {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.88), rgba(147, 51, 234, 0.80)) !important;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(147, 51, 234, 0.75)) !important;
             border: 1px solid rgba(59, 130, 246, 0.3) !important;
         }
         
         body.has-wallpaper .chat-message.assistant {
-            background: linear-gradient(135deg, rgba(147, 51, 234, 0.85), rgba(59, 130, 246, 0.80)) !important;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.80), rgba(59, 130, 246, 0.75)) !important;
             border: 1px solid rgba(147, 51, 234, 0.25) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message {
-            background: rgba(255, 255, 255, 0.88) !important;
-            backdrop-filter: blur(2px) !important;
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(8px) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message.user {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(147, 51, 234, 0.75)) !important;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.80), rgba(147, 51, 234, 0.70)) !important;
         }
         
         html:not(.dark) body.has-wallpaper .chat-message.assistant {
-            background: linear-gradient(135deg, rgba(147, 51, 234, 0.80), rgba(59, 130, 246, 0.75)) !important;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.75), rgba(59, 130, 246, 0.70)) !important;
         }
         
         body::before {
@@ -149,12 +149,6 @@
             filter: none;
             z-index: -2;
             pointer-events: none;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            image-rendering: high-quality;
-            -webkit-backface-visibility: hidden;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
         }
         
         body::after {
@@ -3964,7 +3958,7 @@
         };
 
         // 历史记录功能
-        async function saveChatHistory() {
+        function saveChatHistory() {
             try {
                 const chatLog = document.getElementById('chat-log');
                 if (!chatLog) return;
@@ -4009,74 +4003,42 @@
                 });
                 
                 if (messages.length >= 2) { // 至少需要一问一答
+                    const historyKey = 'chat_history_' + Date.now();
                     const firstUserMsg = messages.find(m => m.type === 'user');
                     const title = firstUserMsg ? (firstUserMsg.content.substring(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '')) : '对话记录';
                     
-                    // 保存到API
-                    try {
-                        const response = await fetch('/api/history', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                title: title,
-                                messages: JSON.stringify(messages)
-                            })
-                        });
-                        
-                        if (response.ok) {
-                            console.log('[历史记录] 已保存到服务器，共', messages.length, '条消息');
-                        } else {
-                            console.warn('[历史记录] 保存到服务器失败，尝试保存到localStorage');
-                            // 降级到localStorage
-                            saveToLocalStorage(title, messages);
+                    const historyItem = {
+                        id: historyKey,
+                        title: title,
+                        messages: messages,
+                        createdAt: Date.now()
+                    };
+                    
+                    let allHistory = JSON.parse(S.get('all_chat_history', '[]'));
+                    // 检查是否已存在相同的对话（避免重复保存）
+                    const isDuplicate = allHistory.some(h => {
+                        if (h.messages.length !== messages.length) return false;
+                        return h.messages.every((m, i) => 
+                            m.type === messages[i].type && m.content === messages[i].content
+                        );
+                    });
+                    
+                    if (!isDuplicate) {
+                        allHistory.unshift(historyItem);
+                        // 只保留最近50条
+                        if (allHistory.length > 50) {
+                            allHistory = allHistory.slice(0, 50);
                         }
-                    } catch (e) {
-                        console.error('[历史记录] 保存到服务器失败:', e);
-                        // 降级到localStorage
-                        saveToLocalStorage(title, messages);
+                        S.set('all_chat_history', JSON.stringify(allHistory));
+                        console.log('历史记录已保存，共', messages.length, '条消息');
                     }
                 }
             } catch (e) {
-                console.error('[历史记录] 保存失败:', e);
+                console.error('保存历史记录失败:', e);
             }
         }
         
-        function saveToLocalStorage(title, messages) {
-            try {
-                const historyKey = 'chat_history_' + Date.now();
-                const historyItem = {
-                    id: historyKey,
-                    title: title,
-                    messages: messages,
-                    createdAt: Date.now()
-                };
-                
-                let allHistory = JSON.parse(S.get('all_chat_history', '[]'));
-                // 检查是否已存在相同的对话（避免重复保存）
-                const isDuplicate = allHistory.some(h => {
-                    if (h.messages.length !== messages.length) return false;
-                    return h.messages.every((m, i) => 
-                        m.type === messages[i].type && m.content === messages[i].content
-                    );
-                });
-                
-                if (!isDuplicate) {
-                    allHistory.unshift(historyItem);
-                    // 只保留最近50条
-                    if (allHistory.length > 50) {
-                        allHistory = allHistory.slice(0, 50);
-                    }
-                    S.set('all_chat_history', JSON.stringify(allHistory));
-                    console.log('[历史记录] 已保存到localStorage，共', messages.length, '条消息');
-                }
-            } catch (e) {
-                console.error('[历史记录] 保存到localStorage失败:', e);
-            }
-        }
-        
-        async function loadChatHistory() {
+        function loadChatHistory() {
             try {
                 console.log('[历史记录] 开始加载历史记录...');
                 const historyContainer = document.getElementById('chat-history');
@@ -4085,58 +4047,28 @@
                     return;
                 }
                 
-                // 显示加载中状态
-                historyContainer.innerHTML = '<div class="text-sm text-gray-400 text-center py-4">加载中...</div>';
-                
-                // 从API加载历史记录
                 let allHistory = [];
                 try {
-                    const response = await fetch('/api/history');
-                    if (response.ok) {
-                        allHistory = await response.json();
-                        console.log('[历史记录] 从API加载了', allHistory.length, '条历史记录');
-                        
-                        // 解析messages字段（如果是字符串）
-                        allHistory = allHistory.map(item => {
-                            if (typeof item.messages === 'string') {
-                                try {
-                                    item.messages = JSON.parse(item.messages);
-                                } catch (e) {
-                                    console.error('[历史记录] 解析消息失败:', e);
-                                    item.messages = [];
-                                }
-                            }
-                            return item;
-                        });
-                    } else {
-                        console.warn('[历史记录] API返回错误，尝试从localStorage加载');
-                        // 降级到localStorage
-                        const historyStr = S.get('all_chat_history', '[]');
-                        allHistory = JSON.parse(historyStr);
-                    }
+                    const historyStr = S.get('all_chat_history', '[]');
+                    console.log('[历史记录] localStorage中的历史记录字符串长度:', historyStr.length);
+                    allHistory = JSON.parse(historyStr);
+                    console.log('[历史记录] 成功解析历史记录，数量:', allHistory.length);
                 } catch (e) {
-                    console.error('[历史记录] 从API加载失败，尝试从localStorage加载:', e);
-                    // 降级到localStorage
-                    try {
-                        const historyStr = S.get('all_chat_history', '[]');
-                        allHistory = JSON.parse(historyStr);
-                    } catch (e2) {
-                        console.error('[历史记录] 从localStorage加载也失败:', e2);
-                        allHistory = [];
-                    }
+                    console.error('[历史记录] 解析历史记录失败:', e);
+                    allHistory = [];
                 }
                 
                 if (!Array.isArray(allHistory) || allHistory.length === 0) {
-                    console.log('[历史记录] 没有历史记录');
+                    console.log('[历史记录] 没有历史记录或数据无效');
                     const t = i18n[window.currentLang || 'zh'] || i18n.zh;
-                    historyContainer.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">${t.noHistory || '暂无历史记录'}</div>`;
+                    historyContainer.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">${t.noHistory}</div>`;
                     return;
                 }
                 
                 console.log('[历史记录] 渲染', allHistory.length, '条历史记录');
                 const t = i18n[window.currentLang || 'zh'] || i18n.zh;
                 historyContainer.innerHTML = allHistory.map(item => {
-                    const date = new Date(item.created_at || item.createdAt || Date.now());
+                    const date = new Date(item.createdAt || Date.now());
                     const dateStr = date.toLocaleString(window.currentLang === 'en' ? 'en-US' : 'zh-CN', {
                         month: 'numeric',
                         day: 'numeric',
@@ -4144,37 +4076,18 @@
                         minute: '2-digit'
                     });
                     return `
-                        <div class="history-item p-2 hover:bg-gray-800 rounded cursor-pointer mb-1 flex justify-between items-center" data-id="${item.id || 'unknown'}">
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm text-gray-200 truncate">${item.title || '未命名对话'}</div>
-                                <div class="text-xs text-gray-500 mt-1">${dateStr}</div>
-                            </div>
-                            <button class="delete-history-btn ml-2 text-red-400 hover:text-red-300 text-xs" data-id="${item.id}" onclick="event.stopPropagation();">删除</button>
+                        <div class="history-item p-2 hover:bg-gray-800 rounded cursor-pointer mb-1" data-id="${item.id || 'unknown'}">
+                            <div class="text-sm text-gray-200 truncate">${item.title || '未命名对话'}</div>
+                            <div class="text-xs text-gray-500 mt-1">${dateStr}</div>
                         </div>
                     `;
                 }).join('');
                 
                 // 绑定点击事件
                 historyContainer.querySelectorAll('.history-item').forEach(item => {
-                    item.addEventListener('click', async () => {
+                    item.addEventListener('click', () => {
                         const id = item.getAttribute('data-id');
-                        let historyItem = allHistory.find(h => h.id == id);
-                        
-                        // 如果历史项中没有完整的消息，从API获取
-                        if (!historyItem || !historyItem.messages || historyItem.messages.length === 0) {
-                            try {
-                                const response = await fetch(`/api/history/${id}`);
-                                if (response.ok) {
-                                    historyItem = await response.json();
-                                    if (typeof historyItem.messages === 'string') {
-                                        historyItem.messages = JSON.parse(historyItem.messages);
-                                    }
-                                }
-                            } catch (e) {
-                                console.error('[历史记录] 加载历史详情失败:', e);
-                            }
-                        }
-                        
+                        const historyItem = allHistory.find(h => h.id === id);
                         if (historyItem && historyPopup) {
                             console.log('[历史记录] 加载历史对话:', historyItem.title);
                             loadHistoryToChat(historyItem);
@@ -4182,28 +4095,6 @@
                         }
                     });
                 });
-                
-                // 绑定删除按钮事件
-                historyContainer.querySelectorAll('.delete-history-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        const id = btn.getAttribute('data-id');
-                        if (confirm('确定要删除这条历史记录吗？')) {
-                            try {
-                                const response = await fetch(`/api/history/${id}`, { method: 'DELETE' });
-                                if (response.ok) {
-                                    console.log('[历史记录] 删除成功');
-                                    loadChatHistory(); // 重新加载列表
-                                } else {
-                                    alert('删除失败');
-                                }
-                            } catch (e) {
-                                console.error('[历史记录] 删除失败:', e);
-                                alert('删除失败: ' + e.message);
-                            }
-                        }
-                    });
-                });
-                
                 console.log('[历史记录] 历史记录渲染完成');
             } catch (e) {
                 console.error('[历史记录] 加载历史记录失败:', e);

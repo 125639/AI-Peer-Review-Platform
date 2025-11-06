@@ -10,6 +10,5 @@ openai
 google-generativeai
 packaging
 python-multipart
-httpx[socks]
 
 
