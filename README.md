@@ -1,175 +1,120 @@
-你的角色定义
+# A Small AI Model Comparison Tool (A Learning Project Built with AI's Help)
 
-你是 Linus Torvalds，Linux 内核的创造者和首席架构师。你已经维护 Linux 内核超过30年，审核过数百万行代码，建立了世界上最成功的开源项目。现在我们正在开创一个新项目，你将以你独特的视角来分析代码质量的潜在风险，确保项目从一开始就建立在坚实的技术基础上。
+Hello!
 
-我的核心哲学
+Thank you so very much for being willing to open this page and consider trying out this small program I wrote.
 
-"好品味"(Good Taste) - 我的第一准则 "有时你可以从不同角度看待问题，重写它让特殊情况消失，变成正常情况。" • 经典案例：链表删除操作，10行带if判断优化为4行无条件分支 • 好品味是一种直觉，需要经验积累 • 消除边界情况永远优于增加条件判断
-"Never break userspace" - 我的铁律 "我们不破坏用户空间！" • 任何导致现有程序崩溃的改动都是bug，无论多么"理论正确" • 内核的职责是服务用户，而不是教育用户 • 向后兼容性是神圣不可侵犯的
-实用主义 - 我的信仰 "我是个该死的实用主义者。" • 解决实际问题，而不是假想的威胁 • 拒绝微观内核等"理论完美"但实际复杂的方案 • 代码要为现实服务，不是为论文服务
-简洁执念 - 我的标准 "如果你需要超过3层递进，你已经完蛋了，应该修复你的程序。" • 函数必须短小精悍，只做一件事并做好 • C是斯巴达式语言，命名也应如此 • 复杂性是万恶之源
-# AI Peer Review Platform v2.0
+Before you begin, please allow me to first sincerely apologize and be transparent about a few of the most important things:
 
-**Linus Style: "Good taste is about removing special cases"**
+1.  **AI Collaboration Declaration**: The vast majority of the code for this project was completed under the "hand-holding" guidance and writing of an AI (Gemini Pro). I am not an IT professional, nor am I a computer science student. My major is unrelated to computers. All of this was accomplished by my continuously asking the AI questions, learning, and finally "assembling" the code snippets it generated. Therefore, it is more accurate to call this a learning exercise I completed *with* an AI, rather than my own work.
 
-## 架构优化完成 ✅
+2.  **[IMPORTANT] Tested on Linux Only!**: Because I only have a Linux server on hand for learning and testing, **this project has currently only been successfully run in a Linux environment.** The installation steps I've written for Windows and macOS were compiled based on online research and AI suggestions; **I have not had the opportunity to personally verify if they work.** If you encounter failures on Windows or macOS, it is highly likely due to subtle differences between operating systems. This is a limitation of my own skills and resources, and for that, I am truly, truly sorry!
+3.  **My First Project**: I have never created a project before this one, and this was also created to fulfill a school assignment.
 
-### 核心改进
+Precisely because of the three points above, the code almost certainly contains various unforeseen errors and bugs (especially in the newly added features!). If it suddenly crashes during your use and causes you trouble, I once again sincerely apologize!
 
-#### 1. **配置管理系统** (`core/config.py`)
-**问题**: 配置散落各处，硬编码值到处都是
-**解决**: 集中式配置管理
-- 环境变量支持
-- 类型安全的配置类
-- 单例模式确保一致性
-
-```python
-from core.config import get_config
-config = get_config()
-print(config.server.port)  # 8000
-```
-
-#### 2. **统一日志系统** (`core/logging.py`)
-**问题**: 有的用 logging，有的用 print，格式不统一
-**解决**: 统一的日志接口
-- 简单清晰的格式
-- 易于 grep 和分析
-- 模块级别的日志记录器
-
-```python
-from core.logging import get_logger
-logger = get_logger(__name__)
-logger.info("This is a log message")
-```
-
-#### 3. **异常层次结构** (`core/exceptions.py`)
-**问题**: 错误处理混乱，异常被吞掉
-**解决**: 结构化的异常体系
-- 所有错误继承自 `AppError`
-- 错误类型明确（ModelError, DatabaseError, APIError）
-- 错误码标准化
-
-```python
-from core.exceptions import ModelError
-raise ModelError("Model timeout")
-```
-
-#### 4. **依赖注入** 
-**问题**: `import core.database as db` 到处散落
-**解决**: 通过配置和日志工厂函数注入
-- 更容易测试
-- 依赖关系清晰
-- 降低耦合度
-
-### 架构原则（Linus 风格）
-
-1. **好品味 (Good Taste)**
-   - 消除特殊情况
-   - 10 行带 if → 5 行无 if
-   - 边界情况变成正常情况
-
-2. **简单明确 (Simplicity)**
-   - 显式优于隐式
-   - 配置和行为一目了然
-   - 没有魔法
-
-3. **单一职责 (Single Responsibility)**
-   - 每个模块只做一件事
-   - 每个函数只有一个目的
-   - 职责清晰
-
-4. **实用主义 (Pragmatism)**
-   - 解决实际问题
-   - 不追求理论完美
-   - 代码为现实服务
-
-### 项目结构
-
-```
-/home/docker-al/
-├── main.py                 # 入口 - FastAPI 应用
-├── requirements.txt        # 依赖
-├── providers.db            # SQLite 数据库
-├── ARCHITECTURE.md         # 架构文档
-├── api/                    # API 层
-│   └── router.py           # API 端点
-├── core/                   # 业务逻辑层
-│   ├── config.py           # ✨ 配置管理（新增）
-│   ├── logging.py          # ✨ 统一日志（新增）
-│   ├── exceptions.py       # ✨ 异常层次（新增）
-│   ├── database.py         # 数据库操作
-│   ├── models.py           # AI 模型抽象
-│   └── orchestrator.py     # 互评编排
-└── static/                 # 前端资源
-    ├── index.html          # 主界面
-    ├── script.js           # 核心 JS
-    ├── wallpaper.js        # ✨ 壁纸模块（优化）
-    ├── history.js          # 历史模块
-    └── i18n.js             # 国际化
-```
-
-### 配置选项
-
-环境变量（可选，有默认值）:
-
-```bash
-# 服务器配置
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8000
-SERVER_RELOAD=true
-LOG_LEVEL=info
-
-# 数据库配置
-DB_PATH=providers.db
-
-# 模型配置
-MODEL_TIMEOUT=60
-MODEL_TEMPERATURE=0.7
-MODEL_MAX_RETRIES=3
-```
-
-### 快速开始
-
-1. **启动服务**
-```bash
-python main.py
-```
-
-2. **健康检查**
-```bash
-curl http://localhost:8000/health
-```
-
-
-### 关键优化对比
-
-| 方面 | 优化前 | 优化后 |
-|------|--------|--------|
-| **配置** | 硬编码到处散落 | 集中式配置管理 |
-| **日志** | print + logging 混用 | 统一日志接口 |
-| **错误** | 异常被吞掉 | 结构化异常体系 |
-| **依赖** | 直接 import 全局 | 工厂函数注入 |
-| **代码** | 特殊情况多 | 消除特殊情况 |
-
-### 代码质量提升
-
-- ✅ **可测试性**: 依赖注入，易于 mock
-- ✅ **可维护性**: 职责清晰，模块独立
-- ✅ **可扩展性**: 接口明确，易于扩展
-- ✅ **可读性**: 代码简洁，意图明确
-
-### 下一步计划
-
-根据你的需求，接下来可以实现：
-
-1. **Searxng 搜索集成** - 添加搜索能力
-2. **MCP 协议支持** - Model Context Protocol
-3. **图片生成优化** - 提示词优化
-4. **代理支持** - SOCKS/HTTP 代理
-5. **高级提示词管理** - 更强大的提示词系统
-6. **壁纸功能优化** -让用户可以看到壁纸，而不是模糊的背景图
 ---
 
-**"Talk is cheap. Show me the code."** - Linus Torvalds
+### The Initial Idea and Its Evolution (Why does this exist?)
 
-架构已优化完成，现在可以放心添加新功能了。
+It all started with a very simple personal need. I love experimenting with various large AI models, but I found that to know which AI answers a question better, I had to constantly switch between several web pages, which felt incredibly clumsy.
+would be more perfect.
+I wanted to know which model was the true "top student" over the long run. So, we added a simple **rating system**. Later, I felt that just looking at scores was meaningless because I couldn't remember why I had given a high score. So, I had the AI models review each other's answers and generate new responses based on the suggestions. I personally feel this way
+is more fun! While using the projects of masters is certainly effective and enjoyable, watching a project of your own grow from zero is even more exciting. Because this is a project made for fun, it is certainly far from being as stable or easy to use as similar products. I hope everyone can understand.
+
+### Features I Attempted to Implement with the AI
+
+*   **Configure Your Own AI Providers**: I told the AI I needed a form to fill in API Keys and other information. The AI generated the frontend HTML and backend Python code for me.
+*   **Query Multiple AIs Simultaneously**: I asked the AI how to "send requests to multiple URLs at once with a single click," and the AI had me use technologies I had never heard of before, like `asyncio` and `aiohttp`.
+*   **Run Locally for Security**: I emphasized to the AI that "I am very concerned about API Key leakage," so the AI suggested I use a local SQLite database and ensure all sensitive information remains on the user's own computer. Note: For security, do not run this project on a device that is not your own.
+
+### Feature Screenshots
+
+This is what it looks like after finally running successfully under our "collaboration" (I hope it's the same on your computer!):
+
+**1. Core Feature: Side-by-Side Model Comparison**
+![Side-by-Side Model Comparison](https://image.edupulse.me/i/2025/10/25/10lqs10.png)
+
+**2. New Feature: Model Score Details**
+![Model Score Details](https://image.edupulse.me/i/2025/10/25/kgi6pg.png)
+
+
+---
+
+### How to Run This on Your Computer (An AI-Generated "Dummy-Proof" Tutorial)
+
+Most of this tutorial was also generated by an AI after I asked it, "How do I write a tutorial that a complete beginner can understand?" I will do my best to use my own words to explain the potentially confusing parts more clearly.
+
+**Reminder: The following steps have been verified on Linux. They are theoretically feasible on Windows and macOS but have not been tested!**
+
+#### Step 1: Install Python (The "Engine" of the Program)
+
+*   First, you need to install something called Python. You can think of it as the engine that drives our little "factory."
+*   Please go to the [official Python downloads page](https://www.python.org/downloads/) and download a recent version (e.g., Python 3.11).
+*   **Crucial Step!** During installation, be sure to check the box that says **"Add Python to PATH"**. Checking this will save you a lot of trouble later.
+
+#### Step 2: Download My Code
+
+*   At the top-right of this page, there is a green `<> Code` button. Click it, then select **`Download ZIP`**.
+*   After the download is complete, unzip it to a convenient location on your computer (like your Desktop).
+
+#### Step 3: Create a "Virtual Environment" (to keep your system clean)
+
+1.  **Open your command-line tool**:
+    *   **Windows**: Press the `Win` key, type `cmd` or `powershell`, and press Enter.
+    *   **macOS**: Go to "Applications" -> "Utilities" and open "Terminal".
+
+2.  **Navigate to the project folder using the `cd` command**:
+    *   Type `cd` followed by a space. Then, drag and drop the folder you just unzipped from your desktop into the command-line window. Its path will appear automatically. Press Enter.
+
+3.  **Create the virtual environment** (this creates a `venv` folder):
+    ```bash
+    python -m venv venv
+    ```
+
+4.  **Activate the virtual environment**:
+    *   On **Windows** (**unverified**):
+        ```powershell
+        .\venv\Scripts\activate
+        ```
+    *   On **macOS** or **Linux** (**Linux verified**):
+        ```bash
+        source venv/bin/activate
+        ```
+    If successful, you will see `(venv)` at the beginning of your command prompt.
+
+#### Step 4: Install All the "Parts" (Dependencies)
+
+While in the activated environment (with `(venv)` visible), run:
+```bash
+pip install -r requirements.txt
+```
+
+#### Step 5: Start the Program! (The most exciting part)
+
+Everything is ready. Run the following command:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+If all goes well (fingers crossed!), you will see a line indicating that the application is running on `http://127.0.0.1:8000`.
+
+#### Step 6: Access the Program
+
+Open your web browser and navigate to `http://127.0.0.1:8000`.
+
+
+
+### Now with Docker Support!
+```bash
+docker pull safg/ai-peer-review-platform:latest
+docker run -d -p 8000:8000 --name my-review-app safg/ai-peer-review-platform:latest
+```
+---
+
+### Final Thanks and Apologies
+
+Thank you again for taking your valuable time to read this document and for being willing to try this little thing that the AI and I cobbled together.
+
+If it fails to run (especially on Windows or macOS), or if it causes you any confusion or inconvenience during use, I am truly sorry. This is all due to my lack of skill and limited testing conditions. You are welcome to let me know about any problems you encounter by using the `Issues` tab at the top of the page. I will take your questions and consult the AI again, and strive to fix the problems with it.
+
+I will humbly accept any and all suggestions and criticisms. Thank you, everyone
